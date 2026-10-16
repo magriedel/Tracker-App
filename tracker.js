@@ -962,6 +962,7 @@ async function importLabs(file) {
       const rows = await readPdfLabRows(file);
       if (!rows.length) { status.textContent = 'No selectable lab result rows found. Scanned/image-only PDFs are not supported; the PDF stayed on this device.'; toast('No selectable lab results found in this PDF.'); return; }
       pendingLabRows = rows;
+      status.textContent = `${rows.length} possible rows extracted locally. Review before adding.`;
       renderLabPdfReview(rows, file.name);
     } catch (error) {
       status.textContent = 'Could not read this PDF. It may be password-protected, damaged, or unsupported.';

@@ -7,13 +7,15 @@ const KNOWN_MARKERS = [
   ['Total T3', /\b(?:total\s*t3|t3\s*,?\s*total)\b/i],
   ['Thyroid peroxidase antibodies', /\b(?:thyroid\s+peroxidase\s+(?:ab|antibodies)|tpo\s*(?:ab|antibodies?))\b/i],
   ['Thyroglobulin antibodies', /\b(?:thyroglobulin\s+(?:ab|antibodies)|tg\s*(?:ab|antibodies?))\b/i],
-  ['25-OH Vitamin D', /\b(?:25\s*-?\s*oh\s+)?vitamin\s*d(?:\s*,?\s*25\s*-?\s*hydroxy)?\b|\b25\s*-?\s*hydroxy\s+vitamin\s*d\b/i],
+  ['25-OH Vitamin D', /\b25\s*-?\s*oh\s+vitamin\s*d\b|\bvitamin\s*d\s*,?\s*25\s*-?\s*hydroxy\b|\b25\s*-?\s*hydroxy\s+vitamin\s*d\b/i],
   ['Thyroid-stimulating immunoglobulin', /\b(?:thyroid\s+stimulating\s+immunoglobulin|tsi)\b/i],
   ['TSH receptor antibodies', /\b(?:tsh\s+receptor\s+(?:ab|antibodies)|trab)\b/i],
   ['TSH', /\b(?:tsh|thyroid\s+stimulating\s+hormone|thyrotropin)\b/i],
   ['TRAb', /\btrab\b/i],
   ['TSI', /\btsi\b/i]
 ];
+const LAB_UNITS = /^(?:%|m?iu\/(?:l|ml)|u?iu\/(?:l|ml)|ng\/(?:dl|ml|l)|pg\/(?:ml|l)|pmol\/l|nmol\/l|mmol\/l|umol\/l|µmol\/l|μmol\/l|mg\/(?:dl|l)|g\/(?:dl|l)|u\/l|iu\/l|cells?\/(?:ul|µl|μl)|k\/ul|fl|pg|seconds?|sec|minutes?|min|ratio|index|copies\/ml|miu\/l|miu\/ml|10\^?\d+\/(?:l|ul))$/i;
+const DOSE_UNITS = /^(?:mg|mcg|µg|μg|ug|g|grams?|iu|ml|capsules?|caps?|tablets?|pills?|scoops?|drops?|cfu|billion)(?:\b|\s|$)/i;
 
 const normalizeDate = (raw) => {
   if (!raw) return '';
@@ -58,7 +60,9 @@ function candidateForLine(line, reportDate) {
     if (!match) continue;
     const tail = line.slice(match.index + match[0].length).replace(DATE_PATTERN, ' ');
     const details = extractValueTail(tail);
-    if (details) return { marker, date, ...details };
+    if (!details || DOSE_UNITS.test(details.units)) return null;
+    if (details.units && !LAB_UNITS.test(details.units.replace(/\s+/g, ''))) return null;
+    return { marker, date, ...details };
   }
   const numeric = firstNumber(line);
   if (!numeric) return null;
@@ -66,7 +70,7 @@ function candidateForLine(line, reportDate) {
   if (marker.length < 2 || marker.length > 60 || !/[a-z]/i.test(marker) || DATE_PATTERN.test(marker)) return null;
   if (/\b(?:page|phone|fax|zip|account|patient|specimen|accession|collected|reported|reference|range|result|date|dob)\b/i.test(marker)) return null;
   const details = extractValueTail(line.slice(numeric.index));
-  return details ? { marker, date, ...details } : null;
+  return details && LAB_UNITS.test(details.units.replace(/\s+/g, '')) ? { marker, date, ...details } : null;
 }
 
 export function parseLabLines(rawLines) {
