@@ -960,7 +960,7 @@ async function importLabs(file) {
     status.textContent = 'Reading PDF text on this device…';
     try {
       const rows = await readPdfLabRows(file);
-      if (!rows.length) { status.textContent = 'No selectable lab result rows found. Scanned/image-only PDFs are not supported; the PDF stayed on this device.'; toast('No selectable lab results found in this PDF.'); return; }
+      if (!rows.length) { status.textContent = 'No lab rows were recognized. This can happen with a scanned PDF or a report layout/units the importer does not recognize; it does not necessarily mean the PDF is scanned. The file stayed on this device. Try selecting and copying report text to confirm it is searchable. A redacted sample PDF or copied result lines would help us adapt the importer.'; toast('No lab rows recognized; check whether text can be selected in the PDF.'); return; }
       pendingLabRows = rows;
       status.textContent = `${rows.length} possible rows extracted locally. Review before adding.`;
       renderLabPdfReview(rows, file.name);
