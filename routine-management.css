@@ -1,0 +1,139 @@
+.routine-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.routine-tab-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: -2px 0 7px;
+}
+
+.routine-tab-actions .text-button {
+  min-height: 25px;
+  padding: 3px 0;
+  color: var(--green);
+  font-size: 0.67rem;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.routine-tab-actions .text-button.delete {
+  color: #99514a;
+}
+
+.routine-tab-actions .text-button:disabled {
+  color: #a5aca7;
+  cursor: not-allowed;
+  text-decoration: none;
+}
+
+.routine-subtab {
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+  touch-action: manipulation;
+}
+
+.routine-group-menu {
+  width: min(340px, calc(100% - 32px));
+  padding: 18px;
+  border: 1px solid #d7e1d9;
+  border-radius: 12px;
+  background: #fbfcfa;
+  color: var(--ink);
+  box-shadow: 0 16px 55px #1c302644;
+}
+
+.routine-group-menu::backdrop {
+  background: #16271f66;
+  backdrop-filter: blur(2px);
+}
+
+.routine-group-menu .dialog-heading {
+  align-items: center;
+  margin-bottom: 14px;
+}
+
+.routine-group-menu .dialog-heading h2 {
+  margin: 0;
+  font: 500 1.2rem Georgia, serif;
+}
+
+.routine-group-menu-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.routine-group-menu-actions .button {
+  min-height: 42px;
+}
+
+.routine-group-menu .danger-button {
+  border: 1px solid #ead8d5;
+  background: #fbefed;
+  color: #99514a;
+}
+
+.item-actions {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  min-height: 20px;
+}
+
+.item-action {
+  min-height: 22px;
+  padding: 2px 0;
+  border: 0;
+  background: transparent;
+  color: var(--green);
+  font-size: 0.68rem;
+  line-height: 1;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.item-action.delete {
+  color: #99514a;
+}
+
+.routine-item-copy > strong {
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 540px) {
+  .routine-actions {
+    gap: 4px;
+  }
+
+  .routine-actions .button {
+    min-height: 30px;
+    padding: 5px 6px;
+    font-size: 0.62rem;
+    white-space: nowrap;
+  }
+
+  .item-actions {
+    gap: 10px;
+  }
+
+  .item-action {
+    min-height: 26px;
+    font-size: 0.68rem;
+  }
+
+  .routine-tab-actions {
+    gap: 13px;
+    margin-top: -1px;
+    margin-bottom: 5px;
+  }
+
+  .routine-tab-actions .text-button {
+    min-height: 28px;
+    font-size: 0.69rem;
+  }
+}

@@ -1,0 +1,329 @@
+.routine-subtabs {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 5px;
+  overflow: visible;
+  margin: 4px 0 7px;
+  padding: 3px 1px 7px;
+}
+
+.routine-subtab {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 0;
+  min-height: 38px;
+  padding: 6px 8px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: #fff;
+  color: #59675f;
+  font-size: 0.73rem;
+  line-height: 1.2;
+  text-align: center;
+  overflow-wrap: anywhere;
+}
+
+.routine-subtab.active {
+  border-color: #739680;
+  background: #eaf1eb;
+  color: var(--green-dark);
+  box-shadow: inset 0 -2px var(--green);
+}
+
+.stool-event {
+  grid-template-columns: 22px minmax(68px, 0.55fr) minmax(0, 1.45fr) 22px;
+  gap: 6px;
+  align-items: center;
+}
+
+.stool-event select {
+  width: 100%;
+  min-width: 0;
+  min-height: 36px;
+  padding: 6px 24px 6px 8px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background-color: #fff;
+  color: var(--ink);
+  font-size: 0.74rem;
+  line-height: 1.2;
+  text-overflow: ellipsis;
+}
+
+.stool-event .stool-time-select {
+  text-align: center;
+  padding-left: 5px;
+  padding-right: 18px;
+}
+
+.stool-event .text-button {
+  grid-column: 4;
+  grid-row: 1;
+  min-width: 20px;
+  padding: 4px 0;
+}
+
+.stool-picker {
+  position: relative;
+  min-width: 0;
+}
+
+.stool-picker-trigger {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 4px;
+  width: 100%;
+  min-width: 0;
+  min-height: 34px;
+  padding: 5px 7px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: #fff;
+  color: var(--ink);
+  font-size: 0.75rem;
+  line-height: 1.15;
+  text-align: left;
+}
+
+.stool-picker-trigger span {
+  flex: none;
+  color: var(--muted);
+  font-size: 0.68rem;
+}
+
+.stool-picker-menu[aria-label$="time of day"] {
+  min-width: 116px;
+}
+
+.stool-picker-menu {
+  position: absolute;
+  z-index: 8;
+  top: calc(100% + 3px);
+  left: 0;
+  display: grid;
+  width: max-content;
+  min-width: 100%;
+  max-width: min(270px, calc(100vw - 40px));
+  max-height: 168px;
+  overflow-y: auto;
+  padding: 4px;
+  border: 1px solid #d5dfd7;
+  border-radius: 8px;
+  background: #fff;
+  box-shadow: 0 8px 22px #1f342a26;
+}
+
+.stool-picker-menu[hidden] {
+  display: none;
+}
+
+.stool-picker-option {
+  width: 100%;
+  min-height: 28px;
+  padding: 5px 7px;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--ink);
+  font-size: 12px;
+  line-height: 1.25;
+  text-align: left;
+  white-space: normal;
+}
+
+.stool-picker-option:hover,
+.stool-picker-option:focus-visible,
+.stool-picker-option.selected {
+  background: #eaf1eb;
+  color: var(--green-dark);
+}
+
+.symptom-list {
+  align-items: stretch;
+  gap: 6px;
+}
+
+.symptom-range-field {
+  min-width: 0;
+  min-height: 60px;
+  margin: 0;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+  grid-template-columns: minmax(0, 1fr) 34px;
+  gap: 4px 8px;
+}
+
+.symptom-range-field > span {
+  grid-column: 1;
+  align-self: center;
+  margin: 0;
+  color: var(--ink);
+  font-size: 0.76rem;
+}
+
+.symptom-range-field output {
+  grid-column: 2;
+  grid-row: 1;
+  align-self: center;
+  color: var(--green);
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-align: right;
+}
+
+.symptom-range-field input[type="range"],
+.range-field input[type="range"] {
+  grid-column: 1 / -1;
+  width: 100%;
+  height: 38px;
+  min-height: 38px;
+  margin: 0;
+  padding: 0;
+  appearance: none;
+  -webkit-appearance: none;
+  background: transparent;
+  touch-action: pan-y;
+}
+
+.symptom-range-field input[type="range"]::-webkit-slider-runnable-track,
+.range-field input[type="range"]::-webkit-slider-runnable-track {
+  height: 5px;
+  border-radius: 5px;
+  background: #d7e0d9;
+}
+
+.symptom-range-field input[type="range"]::-webkit-slider-thumb,
+.range-field input[type="range"]::-webkit-slider-thumb {
+  width: 27px;
+  height: 27px;
+  margin-top: -11px;
+  border: 3px solid #fff;
+  border-radius: 50%;
+  appearance: none;
+  -webkit-appearance: none;
+  background: var(--green);
+  box-shadow: 0 1px 4px #1d352944;
+}
+
+.symptom-range-field input[type="range"]::-moz-range-track,
+.range-field input[type="range"]::-moz-range-track {
+  height: 5px;
+  border-radius: 5px;
+  background: #d7e0d9;
+}
+
+.symptom-range-field input[type="range"]::-moz-range-thumb,
+.range-field input[type="range"]::-moz-range-thumb {
+  width: 21px;
+  height: 21px;
+  border: 3px solid #fff;
+  border-radius: 50%;
+  background: var(--green);
+  box-shadow: 0 1px 4px #1d352944;
+}
+
+.field-pair > .range-field {
+  min-width: 0;
+  min-height: 62px;
+  margin: 0;
+  padding: 7px 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+  grid-template-columns: minmax(0, 1fr) 34px;
+  grid-template-rows: auto 32px;
+  gap: 2px 8px;
+}
+
+.field-pair > .range-field label {
+  grid-column: 1;
+  grid-row: 1;
+  align-self: center;
+  margin: 0;
+  color: var(--ink);
+  font-size: 0.76rem;
+}
+
+.field-pair > .range-field output {
+  grid-column: 2;
+  grid-row: 1;
+  align-self: center;
+  color: var(--green);
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-align: right;
+}
+
+.field-pair > .range-field input[type="range"] {
+  grid-column: 1 / -1;
+  grid-row: 2;
+  height: 32px;
+  min-height: 32px;
+}
+
+.symptoms-heading {
+  justify-content: space-between;
+  align-items: center;
+}
+
+.symptoms-heading .text-button {
+  padding: 4px 7px;
+  border-radius: 5px;
+  background: #eaf1eb;
+  color: var(--green-dark);
+  font-size: 0.7rem;
+}
+
+@media (max-width: 540px) {
+  .routine-subtabs {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 4px;
+    margin: 2px -5px 5px;
+  }
+
+  .routine-subtab {
+    min-height: 35px;
+    padding: 5px 3px;
+    font-size: 0.62rem;
+  }
+
+  .stool-event {
+    grid-template-columns: 20px minmax(62px, 0.55fr) minmax(0, 1.45fr) 20px;
+    gap: 4px;
+    padding: 5px 6px;
+  }
+
+  .stool-picker-trigger {
+    min-height: 32px;
+    padding: 4px 5px;
+    font-size: 12px;
+  }
+
+  .stool-picker-option {
+    min-height: 26px;
+    padding: 4px 6px;
+    font-size: 12px;
+  }
+
+  .stool-picker-menu {
+    max-height: 156px;
+  }
+
+  .symptom-range-field {
+    min-height: 62px;
+    padding: 7px 8px;
+  }
+
+  .symptom-range-field > span {
+    font-size: 0.72rem;
+  }
+
+  .field-pair > .range-field {
+    min-height: 62px;
+    padding: 7px 8px;
+  }
+}

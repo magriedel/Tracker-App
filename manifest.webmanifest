@@ -1,0 +1,17 @@
+{
+  "name": "Thyroid Tracker",
+  "short_name": "Thyroid",
+  "description": "Private daily tracking for thyroid, symptoms, labs, and regimen observation.",
+  "start_url": "./",
+  "display": "standalone",
+  "background_color": "#f3f5f2",
+  "theme_color": "#173b35",
+  "icons": [
+    {
+      "src": "./app-icon.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}

@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#173b35" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <meta name="apple-mobile-web-app-title" content="Thyroid Tracker" />
+    <meta name="description" content="A private thyroid and Graves' daily tracking app designed for offline use." />
+    <link rel="manifest" href="./manifest.webmanifest" />
+    <link rel="apple-touch-icon" href="./app-icon.png" />
+    <link rel="stylesheet" href="./tracker.css" />
+    <link rel="stylesheet" href="./correlations.css" />
+    <link rel="stylesheet" href="./enhancements.css?v=7" />
+    <link rel="stylesheet" href="./workflow.css?v=6" />
+    <link rel="stylesheet" href="./routine-tabs.css?v=8" />
+    <link rel="stylesheet" href="./challenge.css?v=6" />
+    <link rel="stylesheet" href="./routine-management.css?v=4" />
+    <link rel="stylesheet" href="./analysis.css?v=1" />
+    <link rel="stylesheet" href="./routine-edit.css?v=7" />
+    <title>Thyroid Tracker</title>
+  </head>
+  <body>
+    <div class="app-shell">
+      <header class="topbar">
+        <div class="brand-lockup"><span class="brand-mark" aria-hidden="true">T</span><div><p class="eyebrow">Private health journal</p><h1>Thyroid Tracker</h1></div></div>
+        <div class="top-actions"><div class="date-export"><label class="date-control"><span>Day</span><input id="entryDate" type="date" /></label><button id="exportJsonBtn" class="icon-button" type="button" aria-label="Export submitted records" title="Export submitted records">Export</button></div><div class="submit-cluster"><button id="submitDay" class="button submit-button" type="button">Submit day</button><span id="submissionStatus">Today is not submitted</span></div></div>
+      </header>
+
+      <section class="quick-capture" aria-label="Quick daily update"><textarea id="quickUpdate" rows="1" aria-label="Quick update" placeholder="What changed today?"></textarea><button id="quickVoiceButton" class="quick-mic" type="button" aria-label="Dictate quick update" title="Dictate quick update">🎙</button><button id="applyQuickUpdate" class="quick-review-button" type="button">Review</button><div id="quickUpdateReview" class="quick-update-review" hidden><p id="quickUpdateStatus" aria-live="polite"></p><button id="confirmQuickUpdate" class="button primary" type="button">Confirm changes</button><button id="cancelQuickUpdate" class="text-button" type="button">Cancel</button></div></section>
+
+      <nav class="tabs" aria-label="Tracker sections" role="tablist">
+        <button class="tab active" id="tab-routine" data-screen="routine" role="tab" aria-selected="true">Routine</button>
+        <button class="tab" id="tab-checkin" data-screen="checkin" role="tab" aria-selected="false">Check-in</button>
+        <button class="tab" id="tab-labs" data-screen="labs" role="tab" aria-selected="false">Labs</button>
+        <button class="tab" id="tab-analysis" data-screen="analysis" role="tab" aria-selected="false">Analysis</button>
+        <button class="tab" id="tab-research" data-screen="research" role="tab" aria-selected="false">Research</button>
+      </nav>
+
+      <main>
+        <section class="screen active" id="screen-routine" role="tabpanel" aria-labelledby="tab-routine">
+          <div class="screen-heading compact-heading"><h2>Routine</h2><button id="addRoutineGroupBtn" class="button secondary small" type="button">＋ Add time tab</button></div>
+          <div class="routine-subtabs" id="routineSubtabs" aria-label="Routine time of day"></div>
+          <div class="part-submit-row"><span id="partSubmitStatus">Changes in this section are not submitted</span><div class="routine-actions"><button id="addItemToSection" class="button secondary small" type="button">＋ Add item</button><button id="submitRoutinePart" class="button secondary small" type="button">Submit section</button></div></div>
+          <div id="routineList" class="routine-list"></div>
+        </section>
+
+        <section class="screen" id="screen-checkin" role="tabpanel" aria-labelledby="tab-checkin" hidden>
+          <div class="screen-heading compact-heading"><h2>Check-in</h2><button id="submitCheckinPart" class="button secondary small" type="button">Submit check-in</button></div>
+          <div class="content-column">
+            <div class="field-pair"><div class="range-field"><label for="energyLevel">Energy</label><input id="energyLevel" type="range" min="0" max="5" step="1" /><output id="energyOutput">0/5</output></div><div class="range-field"><label for="sleepQuality">Sleep quality</label><input id="sleepQuality" type="range" min="0" max="5" step="1" /><output id="sleepOutput">0/5</output></div></div>
+            <div class="section-rule symptoms-heading"><h3>Symptoms</h3><button id="addSymptom" class="text-button" type="button">＋ Add symptom</button></div><div id="symptomList" class="symptom-list"></div>
+            <div class="section-rule"><h3>Bowel movements</h3><span>Optional</span></div>
+            <div class="stool-toolbar"><span>Bowel movements</span><button id="addStoolEvent" class="button secondary small" type="button">＋ Add</button></div><div id="stoolEvents" class="stool-events"></div>
+            <div class="section-rule"><h3>Notes</h3></div>
+            <label class="field"><span>What stood out today?</span><textarea id="dailyNotes" rows="5" placeholder="Symptoms, timing, meals, activity, stress, or anything to mention to your clinician"></textarea></label>
+            <div class="voice-row"><button id="voiceButton" class="button secondary" type="button" aria-pressed="false">🎙 Dictate notes</button><span id="voiceStatus" class="fine-print">Dictation availability and processing depend on your browser. See privacy note before starting.</span></div>
+            <details class="health-import"><summary>Apple Health import</summary><label class="button secondary" for="healthImport">Choose export.xml</label><input id="healthImport" type="file" accept=".xml,application/xml,text/xml" hidden /><span id="healthImportStatus" class="fine-print">Export from Health → profile picture → Export All Health Data; extract export.xml in Files. Parsed locally and backdated by date. Watch syncs to iPhone Health first.</span><div id="healthDaySummary" class="health-day-summary"></div></details>
+          </div>
+        </section>
+
+        <section class="screen" id="screen-labs" role="tabpanel" aria-labelledby="tab-labs" hidden>
+          <div class="screen-heading compact-heading"><h2>Labs</h2><button id="exportCsvBtn" class="button secondary small" type="button">Export CSV</button></div>
+          <div class="lab-toolbar"><label class="field compact-field"><span>Show timeframe</span><select id="labTimeFilter"><option value="all">All results</option><option value="90">Last 90 days</option><option value="365">Last year</option><option value="1825">Last 5 years</option></select></label></div>
+          <details class="lab-entry-details"><summary>＋ Add lab result</summary><form id="labForm" class="lab-form">
+            <label class="field"><span>Marker</span><input id="labMarker" list="markerOptions" required placeholder="e.g. TSH" /><datalist id="markerOptions"><option>TSH</option><option>Free T4</option><option>Free T3</option><option>TRAb</option><option>TSI</option></datalist></label>
+            <label class="field"><span>Result date</span><input id="labDate" type="date" required /></label>
+            <label class="field"><span>Value</span><input id="labValue" type="number" step="any" required placeholder="Value" /></label>
+            <label class="field"><span>Units</span><input id="labUnits" placeholder="Units" /></label>
+            <label class="field"><span>Reference range</span><input id="labReference" placeholder="As printed on report" /></label>
+            <label class="field"><span>Desired low</span><input id="labDesiredLow" type="number" step="any" placeholder="Optional" /></label><label class="field"><span>Desired high</span><input id="labDesiredHigh" type="number" step="any" placeholder="Optional" /></label>
+            <button class="button primary" type="submit">Add result</button>
+          </form></details>
+          <div class="import-row"><label class="button secondary small" for="labImport">Import CSV / text</label><input id="labImport" type="file" accept=".csv,.txt,text/csv,text/plain" hidden /></div>
+          <div id="labDashboard" class="lab-dashboard"></div>
+        </section>
+
+        <section class="screen" id="screen-analysis" role="tabpanel" aria-labelledby="tab-analysis" hidden>
+          <div class="screen-heading compact-heading"><h2>Analysis</h2></div>
+          <div id="analysisRoot"></div>
+        </section>
+
+        <section class="screen" id="screen-research" role="tabpanel" aria-labelledby="tab-research" hidden>
+          <div class="screen-heading compact-heading"><h2>Research</h2></div>
+          <form id="researchForm" class="research-form"><label class="field"><span>General topic</span><select id="researchTopic"><option value="(Graves disease OR Basedow disease) AND (thyroid antibodies OR TRAb OR TSI)">Graves' disease and antibodies</option><option value="Graves disease AND sleep">Graves' disease and sleep</option><option value="hyperthyroidism AND heart rate">Hyperthyroidism and heart rate</option><option value="Graves disease AND exercise">Graves' disease and exercise</option></select></label><button class="button secondary" type="submit">Refresh papers</button></form>
+          <div id="researchResults" class="research-results"></div>
+          <div id="aiReviewArea" class="ai-review-area" hidden><button id="aiReviewButton" class="button secondary" type="button">Compare papers with ChatGPT</button></div>
+          <section class="local-patterns"><div class="section-rule"><h3>Your patterns</h3><span>On this device</span></div><div id="localCorrelations" class="correlation-list"></div></section>
+        </section>
+      </main>
+      <footer class="footer-note">For personal observation and clinician discussion, not diagnosis or treatment advice.</footer>
+      <dialog id="momentumDialog" class="momentum-dialog" aria-labelledby="challengeHeading"><div class="challenge-header"><div><p class="eyebrow">Daily check-in complete</p><h2 id="challengeHeading">A puzzle for you</h2></div><button id="closeChallenge" class="icon-button" type="button" aria-label="Close puzzle">Done</button></div><div class="challenge-meta"><div id="momentumStats" class="momentum-stats"></div><div class="puzzle-stats"><div class="puzzle-stat"><strong id="puzzleSolvedCount">0</strong><span>solved</span></div><div class="puzzle-stat"><strong id="puzzleBestStreak">0</strong><span>best streak</span></div><label class="rating-control"><span>Target rating</span><input id="puzzleRatingInput" type="number" min="400" max="3000" step="50" aria-label="Selected puzzle rating" /></label></div></div><div class="challenge-main"><div class="puzzle-copy"><h3 id="puzzleTitle">White to move</h3><p id="puzzleDescription" class="puzzle-description"></p><div id="puzzleFeedback" class="puzzle-feedback" aria-live="polite"></div><button id="resetPuzzle" class="button secondary small" type="button">Another puzzle</button><a id="puzzleSource" class="puzzle-source" target="_blank" rel="noreferrer" hidden></a></div><div id="chessBoard" class="chess-board" role="grid" aria-label="Chess puzzle board"></div></div><div id="wisdomOverlay" class="wisdom-overlay" hidden role="dialog" aria-modal="true" aria-labelledby="wisdomTitle"><section class="wisdom-card"><p class="eyebrow">A thought for today</p><h3 id="wisdomTitle">Wisdom</h3><p id="wisdomText" class="wisdom-text"></p><button id="closeWisdom" class="button primary" type="button">Continue</button></section></div></dialog>
+      <dialog id="labDetailDialog" class="lab-detail-dialog"><div class="dialog-heading"><div><p class="eyebrow">Marker dashboard</p><h2 id="detailMarkerTitle">Lab marker</h2></div><button id="closeLabDialog" class="icon-button" type="button" aria-label="Exit dashboard">Done</button></div><label class="field compact-field"><span>Timeframe</span><select id="detailTimeFilter"><option value="all">All results</option><option value="90">Last 90 days</option><option value="365">Last year</option><option value="1825">Last 5 years</option></select></label><div id="labGraph" class="lab-graph"></div><div class="field-pair range-edit"><label class="field"><span>Desired low</span><input id="detailDesiredLow" type="number" step="any" /></label><label class="field"><span>Desired high</span><input id="detailDesiredHigh" type="number" step="any" /></label></div><button id="saveDesiredRange" class="button primary" type="button">Save desired range</button></dialog>
+      <dialog id="routineGroupMenu" class="routine-group-menu"><div class="dialog-heading"><div><p class="eyebrow">Routine tab</p><h2 id="routineGroupMenuTitle">Time of day</h2></div><button id="closeRoutineGroupMenu" class="icon-button" type="button" aria-label="Close tab menu">Done</button></div><div class="routine-group-menu-actions"><button id="renameRoutineGroup" class="button secondary" type="button">Rename tab</button><button id="deleteRoutineGroup" class="button danger-button" type="button">Delete tab</button></div></dialog>
+      <div id="toast" class="toast" role="status" aria-live="polite"></div>
+    </div>
+    <script type="module" src="./tracker.js"></script>
+  </body>
+</html>

@@ -1,0 +1,433 @@
+.momentum-dialog {
+  width: min(900px, calc(100% - 28px));
+  max-width: 900px;
+  max-height: min(92vh, 860px);
+  overflow: auto;
+  padding: clamp(16px, 3vw, 28px);
+  border: 1px solid #d2ded5;
+  border-radius: 16px;
+  background: linear-gradient(145deg, #fbfcfa, #eef4ef);
+  color: var(--ink);
+  box-shadow: 0 24px 90px #14251d55;
+}
+
+.momentum-dialog::backdrop {
+  background: #16271f9c;
+  backdrop-filter: blur(4px);
+}
+
+.challenge-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  padding-bottom: 13px;
+  border-bottom: 1px solid #dbe5dd;
+}
+
+.challenge-header h2 {
+  margin: 0;
+  font: 500 1.55rem Georgia, serif;
+}
+
+.challenge-header .icon-button {
+  border-radius: 999px;
+  min-width: 64px;
+}
+
+.challenge-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  margin: 9px 0 14px;
+}
+
+.challenge-meta .momentum-stats,
+.challenge-meta .puzzle-stats {
+  margin: 0;
+}
+
+.challenge-meta .momentum-stats {
+  flex: 1;
+  max-width: 390px;
+}
+
+.challenge-meta .puzzle-stats {
+  flex: 1;
+  max-width: 360px;
+}
+
+.challenge-main {
+  display: grid;
+  grid-template-columns: minmax(180px, 0.72fr) minmax(300px, 1fr);
+  align-items: center;
+  gap: clamp(14px, 3vw, 30px);
+}
+
+.challenge-main .puzzle-copy h3 {
+  margin: 0 0 7px;
+  font: 500 1.25rem Georgia, serif;
+}
+
+.puzzle-description {
+  margin: 0 0 9px;
+  color: var(--muted);
+  font-size: 0.8rem;
+  line-height: 1.45;
+}
+
+.challenge-main .puzzle-feedback {
+  min-height: 38px;
+  margin: 7px 0;
+  color: var(--green-dark);
+  font-size: 0.8rem;
+  line-height: 1.4;
+}
+
+.puzzle-source {
+  display: block;
+  margin-top: 9px;
+  color: #4c6b59;
+  font-size: 0.68rem;
+}
+
+.challenge-main .chess-board {
+  width: min(100%, 480px);
+  aspect-ratio: 1;
+  justify-self: center;
+  display: grid;
+  grid-template-columns: repeat(8, minmax(0, 1fr));
+  border: 5px solid #536d5d;
+  border-radius: 8px;
+  overflow: hidden;
+  background: #536d5d;
+  box-shadow: 0 12px 30px #1a30251f;
+}
+
+.challenge-main .square {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  min-width: 0;
+  aspect-ratio: 1;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  font-family: "Apple Symbols", "Segoe UI Symbol", "Noto Sans Symbols 2", serif;
+  font-size: clamp(30px, 6.3vw, 54px);
+  line-height: 1;
+  color: #19271f;
+  text-shadow: 0 1px 1px #fff7;
+}
+
+.challenge-main .square.dark {
+  background: #78927f;
+  color: #17251e;
+}
+
+.challenge-main .square.light {
+  background: #e4e7d8;
+}
+
+.challenge-main .square.selected {
+  box-shadow: inset 0 0 0 4px #d7ad43;
+}
+
+.challenge-main .square.legal-target {
+  background-image: radial-gradient(circle, #315b3e99 0 22%, transparent 24%);
+}
+
+.challenge-main .square.legal-target:has(.piece) {
+  background-image: radial-gradient(circle, transparent 0 60%, #315b3e99 62% 72%, transparent 74%);
+}
+
+@media (max-width: 680px) {
+  .momentum-dialog {
+    width: calc(100% - 18px);
+    max-height: 94vh;
+    padding: 14px;
+    border-radius: 13px;
+  }
+
+  .challenge-header h2 {
+    font-size: 1.25rem;
+  }
+
+  .challenge-meta {
+    gap: 7px;
+    margin: 8px 0 10px;
+  }
+
+  .challenge-meta .stat,
+  .challenge-meta .puzzle-stat {
+    padding: 6px 5px;
+  }
+
+  .challenge-meta .stat strong,
+  .challenge-meta .puzzle-stat strong {
+    font-size: 1rem;
+  }
+
+  .challenge-main {
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+
+  .challenge-main .puzzle-copy {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 2px 10px;
+  }
+
+  .challenge-main .puzzle-copy h3,
+  .puzzle-description,
+  .challenge-main .puzzle-feedback,
+  .puzzle-source {
+    grid-column: 1 / -1;
+  }
+
+  .challenge-main .puzzle-copy h3 {
+    font-size: 1.05rem;
+  }
+
+  .puzzle-description {
+    margin-bottom: 2px;
+    font-size: 0.72rem;
+  }
+
+  .challenge-main .puzzle-feedback {
+    min-height: 19px;
+    margin: 2px 0;
+    font-size: 0.72rem;
+  }
+
+  .challenge-main .puzzle-copy .button {
+    grid-column: 2;
+    grid-row: 1;
+    padding: 6px 9px;
+    font-size: 0.7rem;
+  }
+
+  .challenge-main .chess-board {
+    width: min(82vw, 430px);
+    max-height: min(82vw, 430px);
+    border-width: 4px;
+  }
+
+  .challenge-main .square {
+    font-size: clamp(29px, 9vw, 43px);
+  }
+}
+
+.momentum-dialog {
+  width: min(820px, calc(100% - 28px));
+  max-height: 94vh;
+}
+
+.challenge-meta {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  align-items: stretch;
+  gap: 0;
+  margin: 10px 0 14px;
+  border-block: 1px solid #dbe5dd;
+}
+
+.challenge-meta .momentum-stats,
+.challenge-meta .puzzle-stats {
+  display: contents;
+}
+
+.challenge-meta .stat,
+.challenge-meta .puzzle-stat,
+.challenge-meta .rating-control {
+  display: grid;
+  align-content: center;
+  gap: 3px;
+  min-width: 0;
+  min-height: 54px;
+  margin: 0;
+  padding: 7px 9px;
+  border-right: 1px solid #e1e9e2;
+}
+
+.challenge-meta .stat:last-child,
+.challenge-meta .rating-control {
+  border-right: 0;
+}
+
+.challenge-meta .stat strong,
+.challenge-meta .puzzle-stat strong {
+  font-size: 1.15rem;
+  line-height: 1.1;
+}
+
+.challenge-meta .stat span,
+.challenge-meta .puzzle-stat span,
+.challenge-meta .rating-control span {
+  color: var(--muted);
+  font-size: 0.66rem;
+  line-height: 1.2;
+}
+
+.challenge-meta .rating-control input {
+  width: 72px;
+  min-height: 27px;
+  padding: 3px 6px;
+  font-size: 0.84rem;
+}
+
+.challenge-main {
+  grid-template-columns: minmax(0, 1fr);
+  gap: 9px;
+}
+
+.challenge-main .puzzle-copy {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 2px 12px;
+}
+
+.challenge-main .puzzle-copy h3,
+.challenge-main .puzzle-description,
+.challenge-main .puzzle-feedback,
+.challenge-main .puzzle-source,
+.challenge-main .fortune-reveal {
+  grid-column: 1 / -1;
+}
+
+.challenge-main .puzzle-copy h3 {
+  grid-column: 1;
+  grid-row: 1;
+  margin: 0;
+  font-size: 1.15rem;
+}
+
+.challenge-main .puzzle-description {
+  margin: 2px 0;
+}
+
+.challenge-main .puzzle-feedback {
+  min-height: 20px;
+  margin: 2px 0;
+}
+
+.challenge-main .puzzle-copy > #resetPuzzle {
+  grid-column: 2;
+  grid-row: 1;
+  justify-self: end;
+}
+
+.challenge-main .chess-board {
+  width: min(100%, 440px);
+  justify-self: center;
+  border: 5px solid #536d5d;
+  border-radius: 7px;
+  gap: 0;
+}
+
+.challenge-main .square {
+  box-shadow: inset -1px -1px 0 #374d3f55;
+}
+
+.challenge-main .square:nth-child(8n + 1) {
+  box-shadow: inset 1px 0 0 #374d3f55, inset -1px -1px 0 #374d3f55;
+}
+
+.wisdom-overlay {
+  position: absolute;
+  z-index: 30;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  border-radius: inherit;
+  background: #17251fb8;
+  backdrop-filter: blur(5px);
+}
+
+.wisdom-overlay[hidden] { display: none; }
+
+.wisdom-card {
+  width: min(440px, 100%);
+  padding: clamp(22px, 5vw, 38px);
+  border: 1px solid #e1e6d9;
+  border-radius: 14px;
+  background: linear-gradient(155deg, #fffef9, #f3f5e9);
+  box-shadow: 0 22px 70px #101a1590;
+  text-align: center;
+  opacity: 0;
+  transform: translateY(16px) scale(.96);
+}
+
+.wisdom-overlay.wisdom-show .wisdom-card {
+  animation: wisdom-card-in 520ms cubic-bezier(.18,.75,.25,1) forwards;
+}
+
+.wisdom-card h3 {
+  margin: 8px 0 14px;
+  color: var(--green-dark);
+  font: 500 1.45rem Georgia, serif;
+}
+
+.wisdom-card .eyebrow { color: #8b7950; }
+
+.wisdom-text {
+  margin: 0 auto 22px;
+  max-width: 34ch;
+  color: #38392f;
+  font: italic 1.15rem/1.55 Georgia, serif;
+}
+
+.wisdom-card .button { min-width: 120px; }
+
+@keyframes wisdom-card-in {
+  0% { opacity: 0; transform: translateY(16px) scale(.96); }
+  100% { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .wisdom-overlay.wisdom-show .wisdom-card { animation-duration: 1ms; }
+}
+
+@media (max-width: 680px) {
+  .momentum-dialog {
+    width: calc(100% - 18px);
+  }
+
+  .challenge-meta {
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+    margin: 7px 0 9px;
+  }
+
+  .challenge-meta .stat,
+  .challenge-meta .puzzle-stat,
+  .challenge-meta .rating-control {
+    min-height: 45px;
+    padding: 5px 4px;
+  }
+
+  .challenge-meta .stat strong,
+  .challenge-meta .puzzle-stat strong {
+    font-size: 0.98rem;
+  }
+
+  .challenge-meta .stat span,
+  .challenge-meta .puzzle-stat span,
+  .challenge-meta .rating-control span {
+    font-size: 0.58rem;
+  }
+
+  .challenge-meta .rating-control input {
+    width: 58px;
+    min-height: 24px;
+    font-size: 0.75rem;
+  }
+
+  .challenge-main .chess-board {
+    width: min(82vw, 480px);
+  }
+}
