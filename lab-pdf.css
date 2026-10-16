@@ -1,0 +1,16 @@
+.lab-pdf-review{width:min(980px,calc(100% - 20px));max-height:min(90dvh,900px);overflow:hidden auto;padding:16px;border:1px solid var(--line);border-radius:12px;background:var(--paper);color:var(--ink);box-shadow:0 20px 80px #17251f44}
+.lab-pdf-review::backdrop{background:#17251f80;backdrop-filter:blur(3px)}
+.lab-pdf-review .dialog-heading{align-items:center}
+.lab-pdf-review .dialog-heading h2{margin-bottom:4px;font-size:1.35rem}
+#labPdfSummary{margin:10px 0;line-height:1.45}
+.lab-pdf-table-wrap{max-width:100%;overflow:auto;border:1px solid var(--line);border-radius:8px;background:var(--white)}
+.lab-pdf-table{width:100%;min-width:760px;border-collapse:collapse;font-size:.78rem}
+.lab-pdf-table th,.lab-pdf-table td{padding:7px;border-bottom:1px solid var(--line);text-align:left;vertical-align:middle}
+.lab-pdf-table th{position:sticky;top:0;background:var(--mint);color:var(--green-dark);font-size:.7rem}
+.lab-pdf-table input:not([type=checkbox]){width:100%;min-width:76px;min-height:36px;padding:6px;border:1px solid var(--line);border-radius:6px;background:#fff;color:var(--ink);font:inherit}
+.lab-pdf-table input[data-field=marker]{min-width:130px}
+.lab-pdf-table input[data-field=date]{min-width:132px}
+.lab-pdf-table input[data-field=value]{min-width:86px}
+.lab-pdf-table input[type=checkbox]{width:18px;height:18px;accent-color:var(--green)}
+.lab-pdf-actions{display:flex;justify-content:flex-end;flex-wrap:wrap;gap:8px;margin-top:12px}
+#labImportStatus{margin:8px 0;color:var(--muted);line-height:1.4}

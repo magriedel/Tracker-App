@@ -2,6 +2,7 @@ import { Chess } from './chess-engine.js';
 import { interpretQuickUpdate } from './quick-update.js';
 import { renderAnalysis } from './analysis.js';
 import { WISDOM } from './wisdom.js';
+import { readPdfLabRows } from './lab-pdf.js';
 
 const STORAGE_KEY = 'thyroid-tracker-v2';
 const LEGACY_KEY = 'thyroid-tracker-local-data-v1';
@@ -88,6 +89,7 @@ let itemMenu = { id: '', moving: false };
 let lastRoutineTap = { group: '', time: 0 };
 let routineTabHoldTimer = null;
 let suppressRoutineTabClick = false;
+let pendingLabRows = [];
 
 function saveData() {
   const submittedDays = Object.fromEntries(Object.entries(data.days).filter(([, day]) => day.submitted || Object.keys(day.parts || {}).length).map(([date, day]) => [date, { submitted: day.submitted, submissionHistory: day.submissionHistory || [], parts: day.parts || {} }]));
@@ -926,11 +928,50 @@ function parseLabText(text) {
   return parsed;
 }
 
-function importLabs(file) {
+function renderLabPdfReview(rows, fileName) {
+  const body = document.getElementById('labPdfRows');
+  body.innerHTML = rows.map((row, index) => `<tr data-pdf-row="${index}"><td><input type="checkbox" data-field="include" checked aria-label="Import ${escapeHtml(row.marker)}" /></td><td><input type="text" data-field="marker" value="${escapeHtml(row.marker)}" aria-label="Marker" /></td><td><input type="date" data-field="date" value="${escapeHtml(row.date)}" aria-label="Result date" /></td><td><input type="number" step="any" data-field="value" value="${escapeHtml(row.value)}" aria-label="Result value" /></td><td><input type="text" data-field="units" value="${escapeHtml(row.units)}" aria-label="Units" /></td><td><input type="text" data-field="reference" value="${escapeHtml(row.reference)}" aria-label="Reference range" /></td></tr>`).join('');
+  document.getElementById('labPdfSummary').textContent = `${rows.length} possible result${rows.length === 1 ? '' : 's'} found in ${fileName}. Check and correct each row before adding.`;
+  document.getElementById('labPdfReview').showModal();
+}
+
+function confirmLabPdfImport() {
+  const selected = [...document.querySelectorAll('#labPdfRows tr[data-pdf-row]')].filter((row) => row.querySelector('[data-field="include"]').checked);
+  if (!selected.length) { toast('Select at least one result to import.'); return; }
+  const imported = [];
+  for (const row of selected) {
+    const field = (name) => row.querySelector(`[data-field="${name}"]`).value.trim();
+    const marker = field('marker'); const date = field('date'); const value = Number(field('value'));
+    if (!marker || !date || field('value') === '' || !Number.isFinite(value)) { toast('Each selected result needs a marker, date and numeric value.'); return; }
+    imported.push({ id: uniqueId('lab-pdf'), marker, date, value, units: field('units'), reference: field('reference') });
+  }
+  data.labs.push(...imported);
+  saveData(); renderLabs(); renderLocalCorrelations();
+  document.getElementById('labPdfReview').close();
+  document.getElementById('labImportStatus').textContent = `${imported.length} result${imported.length === 1 ? '' : 's'} added from PDF. The file was read locally.`;
+  pendingLabRows = [];
+  toast(`${imported.length} PDF lab result${imported.length === 1 ? '' : 's'} imported locally.`);
+}
+
+async function importLabs(file) {
   if (!file) return;
-  if (!/\.(csv|txt)$/i.test(file.name)) { toast('Only CSV and text imports are supported; scanned PDFs stay on your device.'); return; }
+  if (/\.pdf$/i.test(file.name) || file.type === 'application/pdf') {
+    const status = document.getElementById('labImportStatus');
+    status.textContent = 'Reading PDF text on this device…';
+    try {
+      const rows = await readPdfLabRows(file);
+      if (!rows.length) { status.textContent = 'No selectable lab result rows found. Scanned/image-only PDFs are not supported; the PDF stayed on this device.'; toast('No selectable lab results found in this PDF.'); return; }
+      pendingLabRows = rows;
+      renderLabPdfReview(rows, file.name);
+    } catch (error) {
+      status.textContent = 'Could not read this PDF. It may be password-protected, damaged, or unsupported.';
+      toast('Could not read that PDF.');
+    }
+    return;
+  }
+  if (!/\.(csv|txt)$/i.test(file.name)) { toast('Choose a PDF, CSV, or text file.'); return; }
   const reader = new FileReader();
-  reader.onload = () => { const rows = parseLabText(String(reader.result)); if (!rows.length) { toast('No rows recognized. Use marker,date,value,units,reference columns.'); return; } data.labs.push(...rows); saveData(); renderLabs(); toast(`${rows.length} results imported locally.`); };
+  reader.onload = () => { const rows = parseLabText(String(reader.result)); if (!rows.length) { toast('No rows recognized. Use marker,date,value,units,reference columns.'); return; } data.labs.push(...rows); saveData(); renderLabs(); renderLocalCorrelations(); toast(`${rows.length} results imported locally.`); };
   reader.readAsText(file);
 }
 
@@ -1144,7 +1185,11 @@ document.getElementById('submitCheckinPart').addEventListener('click', submitChe
 document.getElementById('exportJsonBtn').addEventListener('click', exportJson);
 document.getElementById('exportCsvBtn').addEventListener('click', exportCsv);
 document.getElementById('labForm').addEventListener('submit', addLab);
-document.getElementById('labImport').addEventListener('change', (event) => importLabs(event.target.files[0]));
+document.getElementById('labImport').addEventListener('change', (event) => { importLabs(event.target.files[0]); event.target.value = ''; });
+document.getElementById('confirmLabPdfImport').addEventListener('click', confirmLabPdfImport);
+document.getElementById('cancelLabPdfImport').addEventListener('click', () => { pendingLabRows = []; document.getElementById('labPdfReview').close(); });
+document.getElementById('closeLabPdfReview').addEventListener('click', () => { pendingLabRows = []; document.getElementById('labPdfReview').close(); });
+document.getElementById('labPdfReview').addEventListener('click', (event) => { if (event.target === event.currentTarget) { pendingLabRows = []; event.currentTarget.close(); } });
 document.getElementById('labTimeFilter').addEventListener('change', renderLabs);
 document.getElementById('detailTimeFilter').addEventListener('change', drawLabGraph);
 document.getElementById('saveDesiredRange').addEventListener('click', saveMarkerRange);
