@@ -1,4 +1,4 @@
-const CACHE_NAME = 'thyroid-tracker-v49';
+const CACHE_NAME = 'thyroid-tracker-v50';
 const APP_SHELL = ['./', './index.html', './tracker.css', './correlations.css', './enhancements.css?v=7', './workflow.css?v=6', './routine-tabs.css?v=8', './challenge.css?v=6', './routine-management.css?v=4', './analysis.css?v=1', './routine-edit.css?v=7', './tracker.js', './quick-update.js', './wisdom.js', './puzzles.json', './analysis.js', './chess-engine.js', './manifest.webmanifest', './app-icon.svg', './app-icon.png'];
 
 self.addEventListener('install', (event) => {
