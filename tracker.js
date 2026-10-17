@@ -862,6 +862,35 @@ function groupLabs() {
   return [...grouped.entries()].sort(([a], [b]) => a.localeCompare(b)).map(([, entries]) => entries.sort((a, b) => a.date.localeCompare(b.date)).map((lab) => ({ ...lab, marker: canonicalLabMarker(lab.marker) })));
 }
 
+function renderLabMergeOptions() {
+  const groups = groupLabs();
+  const tools = document.getElementById('labMergeTools');
+  const options = groups.map((entries) => {
+    const marker = canonicalLabMarker(entries[0].marker);
+    return `<option value="${escapeHtml(markerReferenceKey(marker))}">${escapeHtml(marker)}</option>`;
+  }).join('');
+  ['labMergeSource', 'labMergeTarget'].forEach((id) => { document.getElementById(id).innerHTML = options; });
+  tools.hidden = groups.length < 2;
+}
+
+function mergeLabMarkers(sourceKey, targetKey) {
+  const source = data.labs.find((lab) => markerReferenceKey(lab.marker) === sourceKey);
+  const target = data.labs.find((lab) => markerReferenceKey(lab.marker) === targetKey);
+  if (!source || !target || sourceKey === targetKey) return false;
+  const targetMarker = canonicalLabMarker(target.marker);
+  data.labs.forEach((lab) => { if (markerReferenceKey(lab.marker) === sourceKey) lab.marker = targetMarker; });
+  data.labReferences ||= {};
+  data.desiredRanges ||= {};
+  if (!data.labReferences[targetKey] && data.labReferences[sourceKey]) data.labReferences[targetKey] = data.labReferences[sourceKey];
+  if (!Object.hasOwn(data.desiredRanges, targetKey) && Object.hasOwn(data.desiredRanges, sourceKey)) data.desiredRanges[targetKey] = data.desiredRanges[sourceKey];
+  delete data.labReferences[sourceKey];
+  delete data.desiredRanges[sourceKey];
+  saveData();
+  renderLabs();
+  renderLocalCorrelations();
+  return true;
+}
+
 function withinTimeframe(labs, days) {
   if (!days || days === 'all') return labs;
   const cutoff = new Date(); cutoff.setDate(cutoff.getDate() - Number(days));
@@ -892,6 +921,7 @@ function labRangeState(lab, range) {
 
 function renderLabs() {
   const el = document.getElementById('labDashboard');
+  renderLabMergeOptions();
   const groups = groupLabs().map((entries) => withinTimeframe(entries, document.getElementById('labTimeFilter').value)).filter((entries) => entries.length);
   if (!groups.length) { el.innerHTML = '<div class="empty-state">No results in this time period. Try a wider filter or add a result.</div>'; return; }
   const dates = [...new Set(groups.flatMap((entries) => entries.map((lab) => lab.date)))].sort((a, b) => b.localeCompare(a));
@@ -1327,6 +1357,19 @@ document.getElementById('submitCheckinPart').addEventListener('click', submitChe
 document.getElementById('exportJsonBtn').addEventListener('click', exportJson);
 document.getElementById('exportCsvBtn').addEventListener('click', exportCsv);
 document.getElementById('labForm').addEventListener('submit', addLab);
+document.getElementById('labMergeForm').addEventListener('submit', (event) => {
+  event.preventDefault();
+  const sourceKey = document.getElementById('labMergeSource').value;
+  const targetKey = document.getElementById('labMergeTarget').value;
+  if (!sourceKey || !targetKey || sourceKey === targetKey) { toast('Choose two different markers to combine.'); return; }
+  const source = data.labs.find((lab) => markerReferenceKey(lab.marker) === sourceKey);
+  const target = data.labs.find((lab) => markerReferenceKey(lab.marker) === targetKey);
+  if (!source || !target) return;
+  const sourceName = canonicalLabMarker(source.marker);
+  const targetName = canonicalLabMarker(target.marker);
+  if (!confirm(`Combine ${sourceName} into ${targetName}? All dated results will be kept.`)) return;
+  if (mergeLabMarkers(sourceKey, targetKey)) toast(`Results combined under ${targetName}.`);
+});
 document.getElementById('labImport').addEventListener('change', (event) => { importLabs(event.target.files[0]); event.target.value = ''; });
 document.getElementById('confirmLabPdfImport').addEventListener('click', confirmLabPdfImport);
 document.getElementById('cancelLabPdfImport').addEventListener('click', () => { pendingLabRows = []; document.getElementById('labPdfReview').close(); });

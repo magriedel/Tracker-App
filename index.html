@@ -19,7 +19,7 @@
     <link rel="stylesheet" href="./routine-management.css?v=4" />
     <link rel="stylesheet" href="./analysis.css?v=1" />
     <link rel="stylesheet" href="./routine-edit.css?v=7" />
-    <link rel="stylesheet" href="./lab-pdf.css?v=21" />
+    <link rel="stylesheet" href="./lab-pdf.css?v=22" />
     <link rel="stylesheet" href="./folders.css?v=1" />
     <title>Thyroid Tracker</title>
   </head>
@@ -74,6 +74,7 @@
             <label class="field"><span>Desired low</span><input id="labDesiredLow" type="number" step="any" placeholder="Optional" /></label><label class="field"><span>Desired high</span><input id="labDesiredHigh" type="number" step="any" placeholder="Optional" /></label>
             <button class="button primary" type="submit">Add result</button>
           </form></details><label class="button secondary lab-import-button" for="labImport">Import PDF / CSV</label><input id="labImport" type="file" accept=".pdf,application/pdf,.csv,.txt,text/csv,text/plain" hidden /></div><label class="field compact-field lab-timeframe"><span>Show timeframe</span><select id="labTimeFilter"><option value="all">All results</option><option value="90">Last 90 days</option><option value="365">Last year</option><option value="1825">Last 5 years</option></select></label></div><p id="labImportStatus" class="fine-print" role="status" hidden></p>
+          <details class="lab-merge-tools" id="labMergeTools" hidden><summary>Combine duplicate markers</summary><p>Use only for the same test with different names, such as English and Spanish. Every dated result is kept; do not combine different tests such as Free T4 and Total T4.</p><form id="labMergeForm" class="lab-merge-form"><label class="field"><span>Combine this marker</span><select id="labMergeSource" required></select></label><label class="field"><span>Into this marker</span><select id="labMergeTarget" required></select></label><button class="button secondary" type="submit">Combine markers</button></form></details>
           <div id="labDashboard" class="lab-dashboard"></div>
         </section>
 
@@ -104,7 +105,7 @@
       <dialog id="routineGroupMenu" class="routine-group-menu"><div class="dialog-heading"><div><p class="eyebrow">Routine tab</p><h2 id="routineGroupMenuTitle">Time of day</h2></div><button id="closeRoutineGroupMenu" class="icon-button" type="button" aria-label="Close tab menu">Done</button></div><div class="routine-group-menu-actions"><button id="renameRoutineGroup" class="button secondary" type="button">Rename tab</button><button id="deleteRoutineGroup" class="button danger-button" type="button">Delete tab</button></div></dialog>
       <div id="toast" class="toast" role="status" aria-live="polite"></div>
     </div>
-    <script type="module" src="./tracker.js?v=18"></script>
+    <script type="module" src="./tracker.js?v=20"></script>
     <script type="module" src="./folders.js?v=1"></script>
   </body>
 </html>
