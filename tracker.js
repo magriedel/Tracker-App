@@ -897,6 +897,7 @@ function renderLabs() {
   const bodyRows = groups.map((entries) => {
     const newestFirst = entries.slice().reverse();
     const marker = canonicalLabMarker(entries[0].marker);
+    const range = markerRange(marker);
     const units = [...new Set(entries.map((lab) => lab.units).filter(Boolean))];
     const unitLabel = units.length > 1 ? 'Varies' : units[0] || '—';
     const reference = markerReference(marker) || entries.find((lab) => lab.reference)?.reference || '—';
@@ -904,8 +905,9 @@ function renderLabs() {
       const results = newestFirst.filter((lab) => lab.date === date);
       if (!results.length) return '<td class="lab-missing">N/A</td>';
       const values = results.map((lab) => {
-        const flag = lab.flag ? `${lab.flag}${lab.flagSource === 'reference interval' ? '*' : ''}` : '';
-        return `<div class="lab-date-result"><strong>${escapeHtml(lab.value)}${flag ? ` ${escapeHtml(flag)}` : ''}</strong><button type="button" class="text-button" data-remove-lab="${escapeHtml(lab.id)}" aria-label="Remove ${escapeHtml(marker)} result from ${escapeHtml(lab.date)}">Remove</button></div>`;
+        const state = labRangeState(lab, range);
+        const flagged = state === 'out-range' || ['H', 'L'].includes(String(lab.flag || '').toUpperCase());
+        return `<div class="lab-date-result ${flagged ? 'lab-flagged' : ''}"><strong>${escapeHtml(lab.value)}</strong><button type="button" class="text-button" data-remove-lab="${escapeHtml(lab.id)}" aria-label="Remove ${escapeHtml(marker)} result from ${escapeHtml(lab.date)}">Remove</button></div>`;
       }).join('');
       return `<td class="lab-date-cell">${values}</td>`;
     }).join('');
