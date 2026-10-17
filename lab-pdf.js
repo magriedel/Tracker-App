@@ -14,7 +14,7 @@ const KNOWN_MARKERS = [
   ['TRAb', /\btrab\b/i],
   ['TSI', /\btsi\b/i]
 ];
-const LAB_UNITS = /^(?:%|u?m?iu\/(?:l|ml)|µiu\/(?:l|ml)|μiu\/(?:l|ml)|mu\/l|ng\/(?:dl|ml|l)|pg\/(?:ml|l)|pmol\/l|nmol\/l|mmol\/l|u?mol\/l|µmol\/l|μmol\/l|mg\/(?:dl|l)|g\/(?:dl|l)|u\/l|iu\/l|cells?\/(?:ul|µl|μl)|k\/ul|fl|pg|seconds?|sec|minutes?|min|ratio|index|copies\/ml|10\^?\d+\/(?:l|ul))$/i;
+const LAB_UNITS = /^(?:%|units?|u?m?iu\/(?:l|ml)|µiu\/(?:l|ml)|μiu\/(?:l|ml)|mu\/l|ng\/(?:dl|ml|l)|u?g\/(?:dl|ml|l)|pg\/(?:ml|l)|pmol\/l|nmol\/l|mmol\/l|u?mol\/l|µmol\/l|μmol\/l|mg\/(?:dl|l)|g\/(?:dl|l)|u\/l|iu\/l|ml\/min(?:\/\d+(?:\.\d+)?)?|cells?\/(?:ul|µl|μl)|k\/ul|fl|pg|seconds?|sec|minutes?|min|ratio|index|copies\/ml|10\^?\d+\/(?:l|ul))$/i;
 const DOSE_UNITS = /^(?:mg|mcg|µg|μg|ug|g|grams?|iu|ml|capsules?|caps?|tablets?|pills?|scoops?|drops?|cfu|billion)(?:\s|$)/i;
 
 const normalizeDate = (raw) => {
@@ -28,7 +28,44 @@ const normalizeDate = (raw) => {
 };
 
 function linesFromText(text) {
-  return text.split(/\n+/).map((line) => line.replace(/\s+/g, ' ').trim()).filter(Boolean);
+  const lines = text.split(/\n+/).map((line) => line.replace(/\s+/g, ' ').trim()).filter(Boolean);
+  const joined = [];
+  for (let index = 0; index < lines.length; index += 1) {
+    if (/^Thyroid Peroxidase\s*\(TPO\)$/i.test(lines[index]) && /^Ab\s+\d{2}\b/i.test(lines[index + 1] || '')) joined.push(`${lines[index]} ${lines[++index]}`);
+    else joined.push(lines[index]);
+  }
+  return joined.flatMap(splitAdjacentRows);
+}
+
+function splitAdjacentRows(line) {
+  const markerStart = '(?:WBC|RBC|Hemoglobin|Hematocrit|MCV|MCH|MCHC|RDW|Platelets?|Neutrophils|Lymphs?|Monocytes|Eos|Basos|Immature Granulocytes|eGFR|BUN\\/Creatinine Ratio|Thyroxine|Free Thyroxine Index|Antiparietal Cell Antibody|Thyroid Peroxidase|TSH|Free T[34]|Total T[34])';
+  const suffix = new RegExp(`(not\\s+estab\\.?|[<>]?\\s*-?\\d+(?:[.,]\\d+)?\\s*(?:-|\\u2013|\\u2014|to)\\s*[<>]?\\s*-?\\d+(?:[.,]\\d+)?|[<>]\\s*\\d+(?:[.,]\\d+)?)(?=${markerStart}\\b)`, 'ig');
+  return line.replace(suffix, '$1\n').split('\n').map((part) => part.trim()).filter(Boolean);
+}
+
+function parseOrphanLabcorpResult(line) {
+  const reference = '(?:[<>]?\\s*-?\\d+(?:[.,]\\d+)?\\s*(?:-|\\u2013|\\u2014|to)\\s*[<>]?\\s*-?\\d+(?:[.,]\\d+)?|not\\s+estab\\.?|[<>]\\s*\\d+(?:[.,]\\d+)?)';
+  const match = line.match(new RegExp(`^([<>]?\\s*-?\\d+(?:[.,]\\d+)?)(?:\\s+(HIGH|LOW|H|L))?(?:\\s+([<>]?\\s*-?\\d+(?:[.,]\\d+)?)\\s+(\\d{1,2}[-/]\\d{1,2}[-/]\\d{2,4}))?\\s+([a-zµμ%][a-z0-9µμ/^.-]*)\\s+(${reference})$`, 'i'));
+  if (!match) return null;
+  const [, currentRaw, explicitFlag, previousRaw, previousDate, units, referenceValue] = match;
+  if (!isLabUnit(units) && !/^x?10(?:e|\^)?\d+\/(?:u|µ)?l$/i.test(units.replace(/\s+/g, ''))) return null;
+  const currentValue = Number(currentRaw.replace(/[<>\\s]/g, '').replace(',', '.'));
+  if (!Number.isFinite(currentValue)) return null;
+  return { currentValue, explicitFlag, previousRaw, previousDate, units, reference: referenceValue.trim() };
+}
+
+function isMarkerOnlyLine(line) {
+  const marker = line.replace(/\s+\d{2}$/, '').trim();
+  return marker.length >= 3 && /[a-z]/i.test(marker) && !DATE_PATTERN.test(marker) && !/^[-+]?\d/.test(marker) && !/\b(?:reference interval|not estab)\b/i.test(marker);
+}
+
+function rowsFromOrphan(marker, orphan, currentDate) {
+  const cleanMarker = marker.replace(/\s+\d{2}$/, '').replace(/\s+/g, ' ').trim();
+  const reportFlag = /^H/i.test(orphan.explicitFlag || '') ? 'H' : /^L/i.test(orphan.explicitFlag || '') ? 'L' : '';
+  const derivedFlag = rangeFlag(orphan.currentValue, orphan.reference);
+  const rows = [{ marker: cleanMarker, date: currentDate, value: orphan.currentValue, units: orphan.units, reference: orphan.reference, flag: reportFlag || derivedFlag, flagSource: reportFlag ? 'report' : derivedFlag ? 'reference interval' : '', resultPeriod: 'Current' }];
+  if (orphan.previousRaw && orphan.previousDate) rows.push({ marker: cleanMarker, date: normalizeDate(orphan.previousDate), value: Number(orphan.previousRaw.replace(/[<>\\s]/g, '').replace(',', '.')), units: orphan.units, reference: orphan.reference, flag: '', flagSource: '', resultPeriod: 'Previous' });
+  return rows;
 }
 
 function firstNumber(text) {
@@ -65,16 +102,18 @@ function rangeFlag(value, reference) {
 }
 
 function parseLabcorpCbcLine(line, currentDate) {
-  const match = line.match(/^(.+?)\s+(?:\d{2}\s+)?([<>]?\s*-?\d+(?:[.,]\d+)?)(?:\s+(HIGH|LOW|H|L))?(?:\s+([<>]?\s*-?\d+(?:[.,]\d+)?)\s+(\d{1,2}[-/]\d{1,2}[-/]\d{2,4}))?\s+([a-zµμ%][a-z0-9µμ/^.-]*)\s+([<>]?\s*-?\d+(?:[.,]\d+)?\s*(?:-|\u2013|\u2014|to)\s*[<>]?\s*-?\d+(?:[.,]\d+)?)(?:\s.*)?$/i);
+  const referencePattern = '(?:[<>]?\\s*-?\\d+(?:[.,]\\d+)?\\s*(?:-|\\u2013|\\u2014|to)\\s*[<>]?\\s*-?\\d+(?:[.,]\\d+)?|not\\s+estab\\.?|[<>]\\s*\\d+(?:[.,]\\d+)?)';
+  const unitPattern = '[a-zµμ%][a-z0-9µμ/^.-]*';
+  const match = line.match(new RegExp(`^(.+?)\\s+(?:\\d{2}\\s+)?([<>]?\\s*-?\\d+(?:[.,]\\d+)?)(?:\\s+(HIGH|LOW|H|L))?(?:\\s+([<>]?\\s*-?\\d+(?:[.,]\\d+)?)\\s+(\\d{1,2}[-/]\\d{1,2}[-/]\\d{2,4}))?\\s+(?:(${unitPattern})\\s+)?(${referencePattern})(?:\\s.*)?$`, 'i'));
   if (!match) return null;
-  const [, marker, currentRaw, explicitFlag, previousRaw, previousDate, units, reference] = match;
-  if (!isLabUnit(units)) return null;
+  const [, marker, currentRaw, explicitFlag, previousRaw, previousDate, units = '', referenceValue] = match;
+  if (units && !isLabUnit(units) && !/^x?10(?:e|\^)?\d+\/(?:u|µ)?l$/i.test(units.replace(/\s+/g, ''))) return null;
   const toNumber = (value) => Number(value.replace(/\s/g, '').replace(',', '.'));
   const cleanMarker = marker.replace(/\s+/g, ' ').trim();
   if (!/[a-z]/i.test(cleanMarker)) return null;
   const currentValue = toNumber(currentRaw);
   if (!Number.isFinite(currentValue)) return null;
-  const cleanReference = reference.trim();
+  const cleanReference = referenceValue.trim();
   const derivedFlag = rangeFlag(currentValue, cleanReference);
   const reportFlag = /^H/i.test(explicitFlag || '') ? 'H' : /^L/i.test(explicitFlag || '') ? 'L' : '';
   const rows = [{ marker: cleanMarker, date: currentDate, value: currentValue, units, reference: cleanReference, flag: reportFlag || derivedFlag, flagSource: reportFlag ? 'report' : derivedFlag ? 'reference interval' : '', resultPeriod: 'Current' }];
@@ -108,13 +147,31 @@ function candidateForLine(line, reportDate) {
 }
 
 export function parseLabLines(rawLines) {
-  const lines = Array.isArray(rawLines) ? rawLines : linesFromText(String(rawLines));
+  const sourceLines = Array.isArray(rawLines) ? rawLines : linesFromText(String(rawLines));
+  const normalized = sourceLines.map((line) => line.replace(/\s+/g, ' ').trim()).filter(Boolean);
+  const joined = [];
+  for (let index = 0; index < normalized.length; index += 1) {
+    if (/^Thyroid Peroxidase\s*\(TPO\)$/i.test(normalized[index]) && /^Ab(?:\s+\d{2})?$/i.test(normalized[index + 1] || '')) joined.push(`${normalized[index]} ${normalized[++index]}`);
+    else joined.push(normalized[index]);
+  }
+  const lines = joined.flatMap(splitAdjacentRows);
   const labeledDateLines = lines.filter((line) => /\b(?:collection date|date collected|collected|drawn|draw date|specimen date|result date|reported|date of service|date)\b/i.test(line) && !/\b(?:date of birth|dob)\b/i.test(line));
   let reportDate = '';
   for (const line of labeledDateLines) { const match = line.match(DATE_PATTERN); if (match) { reportDate = normalizeDate(match[1]); if (reportDate) break; } }
   const rows = [];
   const seen = new Set();
+  let orphan = null;
   for (const line of lines) {
+    const orphanMatch = parseOrphanLabcorpResult(line);
+    if (orphanMatch) { orphan = orphanMatch; continue; }
+    if (orphan && isMarkerOnlyLine(line)) {
+      for (const row of rowsFromOrphan(line, orphan, reportDate)) {
+        const key = [row.marker.toLowerCase(), row.date, row.value, row.units.toLowerCase()].join('|');
+        if (!seen.has(key)) { seen.add(key); rows.push(row); }
+      }
+      orphan = null;
+      continue;
+    }
     const structured = parseLabcorpCbcLine(line, reportDate);
     const candidates = structured || [candidateForLine(line, reportDate)].filter(Boolean);
     for (const row of candidates) {
