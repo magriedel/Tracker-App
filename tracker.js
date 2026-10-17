@@ -991,7 +991,7 @@ function renderLabPdfReview(rows, fileName) {
     const row = input.closest('[data-pdf-row]');
     body.querySelectorAll(`[data-marker-key="${CSS.escape(row.dataset.markerKey)}"] [data-field="reference"]`).forEach((peer) => { if (peer !== input) peer.value = input.value; });
   }));
-  document.getElementById('labPdfSummary').textContent = `${rows.length} possible result${rows.length === 1 ? '' : 's'} found in ${fileName}. Review the marker, date, value, units and shared reference per marker before adding. Existing app references replace differing report ranges; edit a reference here to change it consistently. H/L flags are preserved when readable.`;
+  document.getElementById('labPdfSummary').textContent = `${rows.length} possible result${rows.length === 1 ? '' : 's'} found in ${fileName}. Current results use the date in the filename when the report has no collection date. The first numeric reference interval seeds the chart's desired range only when you have not set one. Review markers, dates, values, units and references before adding.`;
   document.getElementById('labPdfReview').showModal();
 }
 
@@ -1021,7 +1021,6 @@ function hasDesiredRange(key) {
   const range = data.desiredRanges?.[key];
   return Boolean(range && ((range.low !== undefined && range.low !== '') || (range.high !== undefined && range.high !== '')));
 }
-  document.getElementById('labPdfSummary').textContent = `${rows.length} possible result${rows.length === 1 ? '' : 's'} found in ${fileName}. Current results use the date in the filename when the report has no collection date. The first numeric reference interval seeds the chart's desired range only when you have not set one. Review markers, dates, values, units and references before adding.`;
 
 function referenceBounds(reference) {
   const text = String(reference || '').replace(/,/g, '.');
