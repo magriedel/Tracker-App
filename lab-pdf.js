@@ -44,6 +44,16 @@ export function isBiomarkerName(marker) {
   return BIOMARKER_PATTERNS.some((pattern) => pattern.test(normalized));
 }
 
+function isExcludedReportLabel(marker) {
+  const normalized = normalizeMarkerText(marker).replace(/\s+\d{2}$/, '');
+  return /^(?:name|patient(?: name| id| number)?|age|sex|gender|dob|date(?: of birth| collected| of service)?|page(?: \d+)?|reference(?: interval| range)?|test(?: name)?|result(?: flag)?|specimen(?: id| type)?|accession(?: number)?|order(?: number)?|account(?: number)?|report(?: date| number)?|labcorp|diagnosis)(?:\b|$)/.test(normalized);
+}
+
+function isStructuredLabMarker(marker) {
+  const normalized = normalizeMarkerText(marker).replace(/\s+\d{2}$/, '');
+  return Boolean(normalized && normalized.length <= 80 && /[a-z]/.test(normalized) && !isExcludedReportLabel(normalized));
+}
+
 export function canonicalLabMarker(marker) {
   const original = String(marker ?? '').trim();
   return MARKER_ALIAS_MAP.get(normalizeMarkerText(original)) || original;
@@ -61,6 +71,7 @@ const normalizeDate = (raw) => {
   const parts = raw.split(/[-/._]/).map(Number);
   let year; let month; let day;
   if (parts[0] > 31) [year, month, day] = parts;
+  else if (parts[0] > 12) { [day, month, year] = parts; if (year < 100) year += year < 50 ? 2000 : 1900; }
   else { [month, day, year] = parts; if (year < 100) year += year < 50 ? 2000 : 1900; }
   if (month < 1 || month > 12 || day < 1 || day > 31) return '';
   return `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
@@ -68,6 +79,13 @@ const normalizeDate = (raw) => {
 
 export function dateFromFilename(fileName) {
   const name = String(fileName || '').replace(/\.[^.]+$/, '');
+  const dottedDmy = name.match(/(?:^|[^0-9])(\d{1,2})\.(\d{1,2})\.((?:19|20)\d{2})(?=$|[^0-9])/);
+  if (dottedDmy) {
+    const date = normalizeDate(`${dottedDmy[1]}.${dottedDmy[2]}.${dottedDmy[3]}`);
+    const [year, month, day] = date.split('-').map(Number);
+    const actual = new Date(Date.UTC(year, month - 1, day));
+    if (date && actual.getUTCFullYear() === year && actual.getUTCMonth() === month - 1 && actual.getUTCDate() === day) return date;
+  }
   const match = name.match(/(?:^|[^0-9])((?:(?:19|20)\d{2}[-/._]\d{1,2}[-/._]\d{1,2})|(?:\d{1,2}[-/._]\d{1,2}[-/._](?:19|20)\d{2}))(?=$|[^0-9])/);
   if (match) {
     const date = normalizeDate(match[1]);
@@ -98,12 +116,7 @@ function linesFromText(text) {
 function splitAdjacentRows(line) {
   const markerStart = '(?:WBC|RBC|Hemoglobin|Hematocrit|MCV|MCH|MCHC|RDW|Platelets?|Neutrophils|Lymphs?|Monocytes|Eos|Basos|Immature Granulocytes|eGFR|BUN\\/Creatinine Ratio|Thyroxine|Free Thyroxine Index|Antiparietal Cell Antibody|Thyroid Peroxidase|TSH|Free T[34]|Total T[34])';
   const suffix = new RegExp(`(not\\s+estab\\.?|[<>]?\\s*-?\\d+(?:[.,]\\d+)?\\s*(?:-|\\u2013|\\u2014|to)\\s*[<>]?\\s*-?\\d+(?:[.,]\\d+)?|[<>]\\s*\\d+(?:[.,]\\d+)?)(?=${markerStart}\\b)`, 'ig');
-  const starts = [...line.matchAll(new RegExp(`${markerStart}\\b(?=(?:\\s+(?:[a-z][a-z0-9()/.-]*|\\([^)]+\\))){0,5}\\s+(?:\\d{2}\\s+)?[<>]?\\s*\\d)`, 'ig'))].map((match) => match.index).filter((index) => index > 0);
-  const parts = [];
-  let start = 0;
-  starts.forEach((index) => { if (index > start) { parts.push(line.slice(start, index).trim()); start = index; } });
-  parts.push(line.slice(start).trim());
-  return parts.flatMap((part) => part.replace(suffix, '$1\n').split('\n').map((item) => item.trim()).filter(Boolean));
+  return line.replace(suffix, '$1\\n').split('\\n').map((item) => item.trim()).filter(Boolean);
 }
 
 function parseOrphanLabcorpResult(line) {
@@ -119,7 +132,7 @@ function parseOrphanLabcorpResult(line) {
 
 function isMarkerOnlyLine(line) {
   const marker = line.replace(/\s+\d{2}$/, '').trim();
-  return marker.length >= 3 && isBiomarkerName(marker) && !DATE_PATTERN.test(marker) && !/^[-+]?\d/.test(marker);
+  return marker.length >= 3 && isStructuredLabMarker(marker) && !DATE_PATTERN.test(marker) && !/^[-+]?\d/.test(marker);
 }
 
 function rowsFromOrphan(marker, orphan, currentDate) {
@@ -170,7 +183,7 @@ function parseLabcorpCbcLine(line, currentDate) {
   const [, marker, currentRaw, explicitFlag, previousRaw, previousDate, tail] = match;
   const toNumber = (value) => Number(value.replace(/\s/g, '').replace(',', '.'));
   const cleanMarker = marker.replace(/\s+/g, ' ').trim();
-  if (!isBiomarkerName(cleanMarker)) return null;
+  if (!isStructuredLabMarker(cleanMarker) || !tail.trim()) return null;
   const currentValue = toNumber(currentRaw);
   if (!Number.isFinite(currentValue)) return null;
   const tailText = tail.trim();
@@ -202,7 +215,7 @@ function parseDatedLabcorpLine(line, currentDate) {
   const current = resultTokens[0];
   const previous = resultTokens.length > 1 ? resultTokens[1] : null;
   const marker = prefix.slice(0, current.index).replace(/\s+01\s*$/, '').trim();
-  if (!isBiomarkerName(marker)) return null;
+  if (!isStructuredLabMarker(marker) || !suffix) return null;
   const between = tokens.filter((token) => token.index > current.index && (!previous || token.index < previous.index)).map((token) => token.text);
   const explicitFlag = between.find((token) => /^(?:high|low|h|l)$/i.test(token)) || '';
   let units = '';

@@ -1007,7 +1007,35 @@ function applyCanonicalLabReferences(rows, useProvidedReference = false) {
     data.labReferences[key] = reference;
     data.labs.forEach((lab) => { if (markerReferenceKey(lab.marker) === key) lab.reference = reference; });
   });
-  rows.forEach((row) => { row.reference = references.get(markerReferenceKey(row.marker)) ?? row.reference ?? ''; });
+  rows.forEach((row) => {
+    const key = markerReferenceKey(row.marker);
+    row.reference = references.get(key) ?? row.reference ?? '';
+    if (!hasDesiredRange(key)) {
+      const bounds = referenceBounds(row.reference);
+      if (bounds) { data.desiredRanges ||= {}; data.desiredRanges[key] = bounds; }
+    }
+  });
+}
+
+function hasDesiredRange(key) {
+  const range = data.desiredRanges?.[key];
+  return Boolean(range && ((range.low !== undefined && range.low !== '') || (range.high !== undefined && range.high !== '')));
+}
+  document.getElementById('labPdfSummary').textContent = `${rows.length} possible result${rows.length === 1 ? '' : 's'} found in ${fileName}. Current results use the date in the filename when the report has no collection date. The first numeric reference interval seeds the chart's desired range only when you have not set one. Review markers, dates, values, units and references before adding.`;
+
+function referenceBounds(reference) {
+  const text = String(reference || '').replace(/,/g, '.');
+  const interval = text.match(/([<>]?\s*-?\d+(?:\.\d+)?)\s*(?:-|\u2013|\u2014|\bto\b)\s*([<>]?\s*-?\d+(?:\.\d+)?)/i);
+  if (interval) {
+    const low = Number(interval[1].replace(/[<>\s]/g, ''));
+    const high = Number(interval[2].replace(/[<>\s]/g, ''));
+    if (Number.isFinite(low) && Number.isFinite(high)) return { low: Math.min(low, high), high: Math.max(low, high) };
+  }
+  const oneSided = text.match(/(?:^|\s)([<>])\s*(-?\d+(?:\.\d+)?)(?:\s|$)/);
+  if (!oneSided) return null;
+  const value = Number(oneSided[2]);
+  if (!Number.isFinite(value)) return null;
+  return oneSided[1] === '>' ? { low: value, high: undefined } : { low: undefined, high: value };
 }
 
 function confirmLabPdfImport() {
