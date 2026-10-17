@@ -58,13 +58,32 @@ const DOSE_UNITS = /^(?:mg|mcg|µg|μg|ug|g|grams?|iu|ml|capsules?|caps?|tablets
 
 const normalizeDate = (raw) => {
   if (!raw) return '';
-  const parts = raw.split(/[-/]/).map(Number);
+  const parts = raw.split(/[-/._]/).map(Number);
   let year; let month; let day;
   if (parts[0] > 31) [year, month, day] = parts;
   else { [month, day, year] = parts; if (year < 100) year += year < 50 ? 2000 : 1900; }
   if (month < 1 || month > 12 || day < 1 || day > 31) return '';
   return `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
 };
+
+export function dateFromFilename(fileName) {
+  const name = String(fileName || '').replace(/\.[^.]+$/, '');
+  const match = name.match(/(?:^|[^0-9])((?:(?:19|20)\d{2}[-/._]\d{1,2}[-/._]\d{1,2})|(?:\d{1,2}[-/._]\d{1,2}[-/._](?:19|20)\d{2}))(?=$|[^0-9])/);
+  if (match) {
+    const date = normalizeDate(match[1]);
+    const [year, month, day] = date.split('-').map(Number);
+    const actual = new Date(Date.UTC(year, month - 1, day));
+    if (date && actual.getUTCFullYear() === year && actual.getUTCMonth() === month - 1 && actual.getUTCDate() === day) return date;
+  }
+  const compact = name.match(/(?:^|[^0-9])((?:19|20)\d{2})(\d{2})(\d{2})(?=$|[^0-9])/);
+  if (compact) {
+    const date = normalizeDate(`${compact[1]}-${compact[2]}-${compact[3]}`);
+    const [year, month, day] = date.split('-').map(Number);
+    const actual = new Date(Date.UTC(year, month - 1, day));
+    if (date && actual.getUTCFullYear() === year && actual.getUTCMonth() === month - 1 && actual.getUTCDate() === day) return date;
+  }
+  return '';
+}
 
 function linesFromText(text) {
   const lines = text.split(/\n+/).map((line) => line.replace(/\s+/g, ' ').trim()).filter(Boolean);
@@ -222,7 +241,7 @@ function candidateForLine(line, reportDate) {
   return details ? { marker, date, ...details } : null;
 }
 
-export function parseLabLines(rawLines) {
+export function parseLabLines(rawLines, filenameDate = '') {
   const sourceLines = Array.isArray(rawLines) ? rawLines : linesFromText(String(rawLines));
   const normalized = sourceLines.map((line) => line.replace(/\s+/g, ' ').trim()).filter(Boolean);
   const joined = [];
@@ -232,7 +251,7 @@ export function parseLabLines(rawLines) {
   }
   const lines = joined.flatMap(splitAdjacentRows);
   const labeledDateLines = lines.filter((line) => /\b(?:collection date|date collected|collected|drawn|draw date|specimen date|result date|reported|date of service|date)\b/i.test(line) && !/\b(?:date of birth|dob)\b/i.test(line));
-  let reportDate = '';
+  let reportDate = filenameDate;
   for (const line of labeledDateLines) { const match = line.match(DATE_PATTERN); if (match) { reportDate = normalizeDate(match[1]); if (reportDate) break; } }
   const rows = [];
   const seen = new Set();
@@ -291,5 +310,5 @@ export async function readPdfLabRows(file) {
     const content = await page.getTextContent();
     lines.push(...textLinesFromItems(content.items));
   }
-  return parseLabLines(lines);
+  return parseLabLines(lines, dateFromFilename(file.name));
 }
