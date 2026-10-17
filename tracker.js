@@ -96,7 +96,6 @@ let toastTimer;
 let selectedSquare = null;
 let currentPublicPapers = [];
 let researchHasLoaded = false;
-let activeLabDate = '';
 let labPortraitTextScale = Math.min(1, Math.max(0.65, Number(localStorage.getItem('thyroid-tracker-lab-text-scale')) || 0.8));
 let activeRoutineGroup = TIME_GROUPS[0][0];
 let pendingQuickUpdate = null;
@@ -897,8 +896,6 @@ function renderLabs() {
   if (!groups.length) { el.innerHTML = '<div class="empty-state">No results in this time period. Try a wider filter or add a result.</div>'; return; }
   const dates = [...new Set(groups.flatMap((entries) => entries.map((lab) => lab.date)))].sort((a, b) => b.localeCompare(a));
   const portrait = window.matchMedia('(max-width:560px) and (orientation:portrait)').matches;
-  if (!dates.includes(activeLabDate)) activeLabDate = dates[0];
-  const activeDateIndex = dates.indexOf(activeLabDate);
   const bodyRows = groups.map((entries) => {
     const newestFirst = entries.slice().reverse();
     const marker = canonicalLabMarker(entries[0].marker);
@@ -906,21 +903,21 @@ function renderLabs() {
     const units = [...new Set(entries.map((lab) => lab.units).filter(Boolean))];
     const unitLabel = units.length > 1 ? 'Varies' : units[0] || '—';
     const reference = markerReference(marker) || entries.find((lab) => lab.reference)?.reference || '—';
-    const cells = dates.map((date, dateIndex) => {
+    const cells = dates.map((date) => {
       const results = newestFirst.filter((lab) => lab.date === date);
-      const dateClass = `lab-date-column${date === activeLabDate ? ' is-active-date' : ''}`;
-      if (!results.length) return `<td class="lab-missing ${dateClass}" data-date-index="${dateIndex}">N/A</td>`;
+      const dateClass = 'lab-date-column';
+      if (!results.length) return `<td class="lab-missing ${dateClass}">N/A</td>`;
       const values = results.map((lab) => {
         const state = labRangeState(lab, range);
         const flagged = state === 'out-range' || ['H', 'L'].includes(String(lab.flag || '').toUpperCase());
         return `<div class="lab-date-result ${flagged ? 'lab-flagged' : ''}"><strong>${escapeHtml(lab.value)}</strong><button type="button" class="text-button" data-remove-lab="${escapeHtml(lab.id)}" aria-label="Remove ${escapeHtml(marker)} result from ${escapeHtml(lab.date)}">Remove</button></div>`;
       }).join('');
-      return `<td class="lab-date-cell ${dateClass}" data-date-index="${dateIndex}">${values}</td>`;
+      return `<td class="lab-date-cell ${dateClass}">${values}</td>`;
     }).join('');
     return `<tr><th scope="row"><button class="lab-marker-link" type="button" data-open-marker="${escapeHtml(marker)}"><strong>${escapeHtml(marker)}</strong><small>Chart</small></button></th>${cells}<td class="lab-matrix-units">${escapeHtml(unitLabel)}</td><td class="lab-matrix-reference">${escapeHtml(reference)}</td></tr>`;
   }).join('');
-  const portraitControls = `<div class="lab-portrait-controls" ${portrait ? '' : 'aria-hidden="true"'}><nav class="lab-date-pager" aria-label="Lab result dates"><button type="button" class="icon-button" data-lab-date-step="-1" aria-label="Newer lab date" ${activeDateIndex <= 0 ? 'disabled' : ''}>‹</button><span>${escapeHtml(activeLabDate)} <small>${activeDateIndex + 1} of ${dates.length}</small></span><button type="button" class="icon-button" data-lab-date-step="1" aria-label="Older lab date" ${activeDateIndex >= dates.length - 1 ? 'disabled' : ''}>›</button></nav><label class="lab-text-size-control"><span>Text size</span><input type="range" min="0.65" max="1" step="0.05" value="${labPortraitTextScale}" aria-label="Lab results text size" data-lab-text-size><output data-lab-text-output>${Math.round(labPortraitTextScale * 100)}%</output></label></div>`;
-  el.innerHTML = `${portraitControls}<div class="lab-results-matrix-wrap"><table class="lab-results-matrix"><thead><tr><th scope="col">Biomarker</th>${dates.map((date, dateIndex) => `<th scope="col" class="lab-date-column${date === activeLabDate ? ' is-active-date' : ''}" data-date-index="${dateIndex}">${escapeHtml(date)}</th>`).join('')}<th scope="col" class="lab-matrix-units">Units</th><th scope="col" class="lab-matrix-reference">Reference</th></tr></thead><tbody>${bodyRows}</tbody></table></div>`;
+  const portraitControls = `<div class="lab-portrait-controls" ${portrait ? '' : 'aria-hidden="true"'}><label class="lab-text-size-control"><span>Text size</span><input type="range" min="0.65" max="1" step="0.05" value="${labPortraitTextScale}" aria-label="Lab results text size" data-lab-text-size><output data-lab-text-output>${Math.round(labPortraitTextScale * 100)}%</output></label></div>`;
+  el.innerHTML = `${portraitControls}<div class="lab-results-matrix-wrap"><table class="lab-results-matrix"><thead><tr><th scope="col">Biomarker</th>${dates.map((date) => `<th scope="col" class="lab-date-column">${escapeHtml(date)}</th>`).join('')}<th scope="col" class="lab-matrix-units">Units</th><th scope="col" class="lab-matrix-reference">Reference</th></tr></thead><tbody>${bodyRows}</tbody></table></div>`;
   updateLabTextScale();
   el.querySelector('[data-lab-text-size]').addEventListener('input', (event) => {
     labPortraitTextScale = Number(event.target.value);
@@ -928,24 +925,6 @@ function renderLabs() {
     el.querySelector('[data-lab-text-output]').value = `${Math.round(labPortraitTextScale * 100)}%`;
     localStorage.setItem('thyroid-tracker-lab-text-scale', String(labPortraitTextScale));
   });
-  el.querySelectorAll('[data-lab-date-step]').forEach((button) => button.addEventListener('click', () => {
-    const nextIndex = Math.max(0, Math.min(dates.length - 1, activeDateIndex + Number(button.dataset.labDateStep)));
-    activeLabDate = dates[nextIndex];
-    renderLabs();
-  }));
-  const matrixWrap = el.querySelector('.lab-results-matrix-wrap');
-  let touchStart = null;
-  matrixWrap.addEventListener('touchstart', (event) => { if (event.touches.length === 1) touchStart = { x: event.touches[0].clientX, y: event.touches[0].clientY }; }, { passive: true });
-  matrixWrap.addEventListener('touchend', (event) => {
-    if (!window.matchMedia('(max-width:560px) and (orientation:portrait)').matches || !touchStart || !event.changedTouches.length) return;
-    const dx = event.changedTouches[0].clientX - touchStart.x;
-    const dy = event.changedTouches[0].clientY - touchStart.y;
-    touchStart = null;
-    if (Math.abs(dx) < 44 || Math.abs(dx) <= Math.abs(dy)) return;
-    const nextIndex = Math.max(0, Math.min(dates.length - 1, activeDateIndex + (dx < 0 ? 1 : -1)));
-    if (nextIndex !== activeDateIndex) { activeLabDate = dates[nextIndex]; renderLabs(); }
-  }, { passive: true });
-  matrixWrap.addEventListener('touchcancel', () => { touchStart = null; }, { passive: true });
   el.querySelectorAll('[data-open-marker]').forEach((button) => button.addEventListener('click', () => openLabDashboard(button.dataset.openMarker)));
   el.querySelectorAll('[data-remove-lab]').forEach((button) => button.addEventListener('click', () => { data.labs = data.labs.filter((lab) => lab.id !== button.dataset.removeLab); saveData(); renderLabs(); renderLocalCorrelations(); }));
 }
