@@ -1274,6 +1274,7 @@ function showScreen(name) {
   const target = document.querySelector(`[data-screen="${name}"]`);
   document.querySelectorAll('[data-screen]').forEach((tab) => { const active = tab === target; tab.classList.toggle('active', active); tab.setAttribute('aria-selected', String(active)); });
   document.querySelectorAll('.screen').forEach((screen) => { const active = screen.id === `screen-${name}`; screen.hidden = !active; screen.classList.toggle('active', active); });
+  if (name === 'labs') renderLabs();
   if (name === 'analysis') renderAnalysis(document.getElementById('analysisRoot'), { days: data.days, labs: data.labs || [], symptoms: allSymptoms() });
   if (name === 'research') { researchHasLoaded = true; chooseResearchTopic(); searchPapers({ preventDefault() {} }); }
 }

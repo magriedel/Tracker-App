@@ -27,16 +27,16 @@
 #labImportStatus[hidden]{display:none}
 .lab-date-result+.lab-date-result{margin-top:6px;padding-top:6px;border-top:1px solid var(--line)}
 .lab-missing{color:var(--muted);text-align:center!important;font-style:italic}
-.lab-results-matrix-wrap{overflow:auto;max-width:100%;max-height:min(68vh,680px);border:1px solid var(--line);border-radius:8px;background:var(--white);overscroll-behavior:contain}
-.lab-results-matrix{width:max-content;min-width:100%;border-collapse:separate;border-spacing:0;font-size:.74rem}
+.lab-results-matrix-wrap{grid-column:1/-1;overflow:auto;max-width:100%;max-height:min(68vh,680px);border:1px solid var(--line);border-radius:8px;background:var(--white);overscroll-behavior:contain}
+.lab-results-matrix{width:100%;min-width:100%;--lab-reference-width:116px;border-collapse:separate;border-spacing:0;table-layout:auto;font-size:.74rem}
 .lab-results-matrix th,.lab-results-matrix td{box-sizing:border-box;padding:6px 7px;border-bottom:1px solid var(--line);border-right:1px solid #e8ede9;text-align:center;vertical-align:top;background:#fff}
 .lab-results-matrix thead th{position:sticky;top:0;z-index:3;background:var(--mint);color:var(--green-dark);font-size:.68rem;white-space:nowrap}
 .lab-results-matrix th:first-child{position:sticky;left:0;z-index:4;width:138px;min-width:138px;max-width:160px;background:#f6f8f6;text-align:left}
 .lab-results-matrix thead th:first-child{top:0;z-index:5;background:var(--mint)}
-.lab-results-matrix th:not(:first-child):not(.lab-matrix-units):not(.lab-matrix-reference),.lab-results-matrix td:not(.lab-matrix-units):not(.lab-matrix-reference){width:126px;min-width:126px;max-width:150px}
-.lab-results-matrix .lab-matrix-units,.lab-results-matrix .lab-matrix-reference{position:sticky;z-index:2;background:#f6f8f6}
+.lab-results-matrix th:not(:first-child):not(.lab-matrix-units):not(.lab-matrix-reference),.lab-results-matrix td:not(.lab-matrix-units):not(.lab-matrix-reference){width:auto;min-width:126px}
+.lab-results-matrix .lab-matrix-units,.lab-results-matrix .lab-matrix-reference{position:sticky;z-index:2;min-width:0;background:#f6f8f6}
 .lab-results-matrix .lab-matrix-reference{right:0;width:116px;min-width:116px;max-width:132px;text-align:left;overflow-wrap:anywhere}
-.lab-results-matrix .lab-matrix-units{right:116px;width:66px;min-width:66px;max-width:76px}
+.lab-results-matrix .lab-matrix-units{right:var(--lab-reference-width);width:66px;min-width:66px;max-width:76px;overflow-wrap:anywhere}
 .lab-results-matrix thead .lab-matrix-units,.lab-results-matrix thead .lab-matrix-reference{z-index:4;background:var(--mint)}
 .lab-results-matrix tbody .lab-matrix-units,.lab-results-matrix tbody .lab-matrix-reference{font-size:.68rem}
 .lab-results-matrix .lab-missing{background:#fbfcfb}
@@ -51,8 +51,8 @@
 .lab-results-matrix .lab-date-result .range-state{margin:0;padding:2px 5px;font-size:.58rem}
 .lab-results-matrix .lab-date-result .lab-delta{font-weight:600}
 .lab-results-matrix .lab-date-result .text-button{justify-self:center;padding:1px 4px;font-size:.61rem}
-@media(max-width:560px){.lab-results-matrix th:first-child{width:108px;min-width:108px;max-width:120px}.lab-results-matrix th:not(:first-child):not(.lab-matrix-units):not(.lab-matrix-reference),.lab-results-matrix td:not(.lab-matrix-units):not(.lab-matrix-reference){width:112px;min-width:112px;max-width:128px}.lab-results-matrix .lab-matrix-units{right:92px;width:54px;min-width:54px;max-width:62px}.lab-results-matrix .lab-matrix-reference{width:92px;min-width:92px;max-width:104px}.lab-results-matrix .lab-matrix-units,.lab-results-matrix .lab-matrix-reference{padding-inline:4px;font-size:.62rem}}
-@media (orientation:landscape) and (max-height:600px) and (max-width:950px){.lab-results-matrix-wrap{max-height:58dvh}.lab-results-matrix th:first-child{width:110px;min-width:110px;max-width:122px}.lab-results-matrix th:not(:first-child):not(.lab-matrix-units):not(.lab-matrix-reference),.lab-results-matrix td:not(.lab-matrix-units):not(.lab-matrix-reference){width:88px;min-width:88px;max-width:96px}.lab-results-matrix .lab-matrix-units{right:84px;width:52px;min-width:52px;max-width:58px}.lab-results-matrix .lab-matrix-reference{width:84px;min-width:84px;max-width:96px}.lab-results-matrix .lab-matrix-units,.lab-results-matrix .lab-matrix-reference{padding-inline:3px;font-size:.59rem}}
+@media(max-width:560px){.lab-results-matrix{--lab-reference-width:92px}.lab-results-matrix th:first-child{width:108px;min-width:108px;max-width:120px}.lab-results-matrix th:not(:first-child):not(.lab-matrix-units):not(.lab-matrix-reference),.lab-results-matrix td:not(.lab-matrix-units):not(.lab-matrix-reference){min-width:112px}.lab-results-matrix .lab-matrix-units{width:54px;min-width:54px;max-width:62px}.lab-results-matrix .lab-matrix-reference{width:92px;min-width:92px;max-width:104px}.lab-results-matrix .lab-matrix-units,.lab-results-matrix .lab-matrix-reference{padding-inline:4px;font-size:.62rem}}
+@media (orientation:landscape) and (max-height:600px) and (max-width:950px){.lab-results-matrix-wrap{max-height:58dvh}.lab-results-matrix{--lab-reference-width:84px}.lab-results-matrix th:first-child{width:110px;min-width:110px;max-width:122px}.lab-results-matrix th:not(:first-child):not(.lab-matrix-units):not(.lab-matrix-reference),.lab-results-matrix td:not(.lab-matrix-units):not(.lab-matrix-reference){min-width:76px}.lab-results-matrix .lab-matrix-units{width:52px;min-width:52px;max-width:58px}.lab-results-matrix .lab-matrix-reference{width:84px;min-width:84px;max-width:96px}.lab-results-matrix .lab-matrix-units,.lab-results-matrix .lab-matrix-reference{padding-inline:3px;font-size:.59rem}}
 @media(max-width:560px){.lab-toolbar{grid-template-columns:minmax(0,1fr) auto;gap:8px}.lab-toolbar>.lab-timeframe{min-width:116px}.lab-toolbar>.lab-timeframe select{width:100%;min-height:34px;padding:6px 7px;font-size:.68rem}.lab-entry-actions:has(.lab-entry-details[open]){grid-column:1/-1;width:100%}.lab-entry-actions:has(.lab-entry-details[open]) .lab-entry-details{width:100%}.lab-entry-details[open] .lab-form{grid-template-columns:repeat(2,minmax(0,1fr));padding:8px}.lab-import-button{min-height:36px;padding:8px 10px;font-size:.73rem}}
 .lab-matrix{width:max-content;min-width:100%;table-layout:auto}
 .lab-matrix th:first-child{position:sticky;left:0;z-index:1;min-width:150px;max-width:210px;background:var(--paper)}
