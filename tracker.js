@@ -97,6 +97,7 @@ let selectedSquare = null;
 let currentPublicPapers = [];
 let researchHasLoaded = false;
 let activeLabDate = '';
+let labPortraitTextScale = Math.min(1, Math.max(0.65, Number(localStorage.getItem('thyroid-tracker-lab-text-scale')) || 0.8));
 let activeRoutineGroup = TIME_GROUPS[0][0];
 let pendingQuickUpdate = null;
 let pendingQuickOverrides = null;
@@ -918,8 +919,15 @@ function renderLabs() {
     }).join('');
     return `<tr><th scope="row"><button class="lab-marker-link" type="button" data-open-marker="${escapeHtml(marker)}"><strong>${escapeHtml(marker)}</strong><small>Chart</small></button></th>${cells}<td class="lab-matrix-units">${escapeHtml(unitLabel)}</td><td class="lab-matrix-reference">${escapeHtml(reference)}</td></tr>`;
   }).join('');
-  const datePager = `<nav class="lab-date-pager" aria-label="Lab result dates" ${portrait ? '' : 'aria-hidden="true"'}><button type="button" class="icon-button" data-lab-date-step="-1" aria-label="Newer lab date" ${activeDateIndex <= 0 ? 'disabled' : ''}>‹</button><span>${escapeHtml(activeLabDate)} <small>${activeDateIndex + 1} of ${dates.length}</small></span><button type="button" class="icon-button" data-lab-date-step="1" aria-label="Older lab date" ${activeDateIndex >= dates.length - 1 ? 'disabled' : ''}>›</button></nav>`;
-  el.innerHTML = `${datePager}<div class="lab-results-matrix-wrap"><table class="lab-results-matrix"><thead><tr><th scope="col">Biomarker</th>${dates.map((date, dateIndex) => `<th scope="col" class="lab-date-column${date === activeLabDate ? ' is-active-date' : ''}" data-date-index="${dateIndex}">${escapeHtml(date)}</th>`).join('')}<th scope="col" class="lab-matrix-units">Units</th><th scope="col" class="lab-matrix-reference">Reference</th></tr></thead><tbody>${bodyRows}</tbody></table></div>`;
+  const portraitControls = `<div class="lab-portrait-controls" ${portrait ? '' : 'aria-hidden="true"'}><nav class="lab-date-pager" aria-label="Lab result dates"><button type="button" class="icon-button" data-lab-date-step="-1" aria-label="Newer lab date" ${activeDateIndex <= 0 ? 'disabled' : ''}>‹</button><span>${escapeHtml(activeLabDate)} <small>${activeDateIndex + 1} of ${dates.length}</small></span><button type="button" class="icon-button" data-lab-date-step="1" aria-label="Older lab date" ${activeDateIndex >= dates.length - 1 ? 'disabled' : ''}>›</button></nav><label class="lab-text-size-control"><span>Text size</span><input type="range" min="0.65" max="1" step="0.05" value="${labPortraitTextScale}" aria-label="Lab results text size" data-lab-text-size><output data-lab-text-output>${Math.round(labPortraitTextScale * 100)}%</output></label></div>`;
+  el.innerHTML = `${portraitControls}<div class="lab-results-matrix-wrap"><table class="lab-results-matrix"><thead><tr><th scope="col">Biomarker</th>${dates.map((date, dateIndex) => `<th scope="col" class="lab-date-column${date === activeLabDate ? ' is-active-date' : ''}" data-date-index="${dateIndex}">${escapeHtml(date)}</th>`).join('')}<th scope="col" class="lab-matrix-units">Units</th><th scope="col" class="lab-matrix-reference">Reference</th></tr></thead><tbody>${bodyRows}</tbody></table></div>`;
+  updateLabTextScale();
+  el.querySelector('[data-lab-text-size]').addEventListener('input', (event) => {
+    labPortraitTextScale = Number(event.target.value);
+    updateLabTextScale();
+    el.querySelector('[data-lab-text-output]').value = `${Math.round(labPortraitTextScale * 100)}%`;
+    localStorage.setItem('thyroid-tracker-lab-text-scale', String(labPortraitTextScale));
+  });
   el.querySelectorAll('[data-lab-date-step]').forEach((button) => button.addEventListener('click', () => {
     const nextIndex = Math.max(0, Math.min(dates.length - 1, activeDateIndex + Number(button.dataset.labDateStep)));
     activeLabDate = dates[nextIndex];
@@ -941,6 +949,16 @@ function renderLabs() {
   el.querySelectorAll('[data-open-marker]').forEach((button) => button.addEventListener('click', () => openLabDashboard(button.dataset.openMarker)));
   el.querySelectorAll('[data-remove-lab]').forEach((button) => button.addEventListener('click', () => { data.labs = data.labs.filter((lab) => lab.id !== button.dataset.removeLab); saveData(); renderLabs(); renderLocalCorrelations(); }));
 }
+
+function updateLabTextScale() {
+  const matrix = document.querySelector('.lab-results-matrix');
+  if (!matrix) return;
+  const portrait = window.matchMedia('(max-width:560px) and (orientation:portrait)').matches;
+  matrix.style.setProperty('--lab-text-scale', portrait ? labPortraitTextScale : 1);
+}
+
+window.addEventListener('resize', updateLabTextScale);
+window.addEventListener('orientationchange', updateLabTextScale);
 
 let selectedLabMarker = '';
 function openLabDashboard(marker) {
