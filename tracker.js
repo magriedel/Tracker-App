@@ -898,21 +898,22 @@ function renderLabs() {
     const newestFirst = entries.slice().reverse();
     const marker = canonicalLabMarker(entries[0].marker);
     const range = markerRange(marker);
+    const units = [...new Set(entries.map((lab) => lab.units).filter(Boolean))];
+    const unitLabel = units.length > 1 ? 'Varies' : units[0] || '—';
+    const reference = markerReference(marker) || entries.find((lab) => lab.reference)?.reference || '—';
     const cells = dates.map((date) => {
       const results = newestFirst.filter((lab) => lab.date === date);
       if (!results.length) return '<td class="lab-missing">N/A</td>';
       const values = results.map((lab) => {
-        const previous = entries.filter((entry) => entry.date < date).at(-1);
-        const delta = previous ? Number(lab.value) - Number(previous.value) : null;
-        const state = labRangeState(lab, range);
-        return `<div class="lab-date-result ${state}"><strong>${escapeHtml(lab.value)}${lab.flag ? ` ${escapeHtml(lab.flag)}` : ''}</strong>${lab.units ? `<small>${escapeHtml(lab.units)}</small>` : ''}<span class="range-state ${state}">${state === 'in-range' ? 'In range' : state === 'out-range' ? 'Out of range' : 'Not set'}</span>${delta !== null ? `<small class="lab-delta">${delta > 0 ? '+' : ''}${escapeHtml(delta.toFixed(2))} vs prior</small>` : ''}<button type="button" class="text-button" data-remove-lab="${escapeHtml(lab.id)}" aria-label="Remove ${escapeHtml(marker)} result from ${escapeHtml(lab.date)}">Remove</button></div>`;
+        const flag = lab.flag ? `${lab.flag}${lab.flagSource === 'reference interval' ? '*' : ''}` : '';
+        return `<div class="lab-date-result"><strong>${escapeHtml(lab.value)}${flag ? ` ${escapeHtml(flag)}` : ''}</strong><button type="button" class="text-button" data-remove-lab="${escapeHtml(lab.id)}" aria-label="Remove ${escapeHtml(marker)} result from ${escapeHtml(lab.date)}">Remove</button></div>`;
       }).join('');
       return `<td class="lab-date-cell">${values}</td>`;
     }).join('');
     const desired = range.low !== undefined || range.high !== undefined ? `desired ${escapeHtml(range.low ?? '—')}–${escapeHtml(range.high ?? '—')}` : 'set desired range';
-    return `<tr><th scope="row"><button class="lab-marker-link" type="button" data-open-marker="${escapeHtml(marker)}"><strong>${escapeHtml(marker)}</strong><small>${desired} · chart</small></button></th>${cells}</tr>`;
+    return `<tr><th scope="row"><button class="lab-marker-link" type="button" data-open-marker="${escapeHtml(marker)}"><strong>${escapeHtml(marker)}</strong><small>${desired} · chart</small></button></th>${cells}<td class="lab-matrix-units">${escapeHtml(unitLabel)}</td><td class="lab-matrix-reference">${escapeHtml(reference)}</td></tr>`;
   }).join('');
-  el.innerHTML = `<div class="lab-results-matrix-wrap"><table class="lab-results-matrix"><thead><tr><th scope="col">Biomarker</th>${dates.map((date) => `<th scope="col">${escapeHtml(date)}</th>`).join('')}</tr></thead><tbody>${bodyRows}</tbody></table></div>`;
+  el.innerHTML = `<div class="lab-results-matrix-wrap"><table class="lab-results-matrix"><thead><tr><th scope="col">Biomarker</th>${dates.map((date) => `<th scope="col">${escapeHtml(date)}</th>`).join('')}<th scope="col" class="lab-matrix-units">Units</th><th scope="col" class="lab-matrix-reference">Reference</th></tr></thead><tbody>${bodyRows}</tbody></table></div><p class="fine-print lab-matrix-note">H/L flags are from the report or inferred from its interval; * marks inferred flags.</p>`;
   el.querySelectorAll('[data-open-marker]').forEach((button) => button.addEventListener('click', () => openLabDashboard(button.dataset.openMarker)));
   el.querySelectorAll('[data-remove-lab]').forEach((button) => button.addEventListener('click', () => { data.labs = data.labs.filter((lab) => lab.id !== button.dataset.removeLab); saveData(); renderLabs(); renderLocalCorrelations(); }));
 }
