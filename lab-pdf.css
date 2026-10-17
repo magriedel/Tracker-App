@@ -19,3 +19,10 @@
 .lab-reference-control{display:grid;grid-template-columns:auto minmax(140px,1fr);align-items:center;gap:10px;color:var(--muted);font-size:.75rem}
 .lab-reference-control input{width:100%;min-width:140px;min-height:36px;padding:6px 8px;border:1px solid var(--line);border-radius:6px;background:#fff;color:var(--ink);font:inherit}
 @media(max-width:560px){.lab-reference-control{grid-template-columns:1fr;gap:4px}}
+.lab-table .lab-reference-head{min-width:146px;white-space:normal;vertical-align:middle}
+.lab-table .lab-reference-head .lab-reference-control input{min-width:128px;min-height:34px;font-size:.72rem}
+.lab-table .lab-value-cell{display:flex;flex-direction:row;justify-content:center;align-items:baseline;flex-wrap:wrap;gap:3px 6px;white-space:normal}
+.lab-table .lab-value-cell strong{font-size:.82rem}
+.lab-table .lab-value-cell .lab-unit,.lab-table .lab-value-cell .lab-delta{display:inline;color:var(--muted);font-size:.65rem}
+.lab-table .lab-value-cell .range-state{display:inline-block;width:max-content;margin:0;padding:2px 4px;font-size:.6rem}
+.lab-table .lab-value-cell .text-button{padding:1px 3px;font-size:.63rem;line-height:1.2}
