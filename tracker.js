@@ -911,7 +911,7 @@ function renderLabs() {
     }).join('');
     return `<tr><th scope="row"><button class="lab-marker-link" type="button" data-open-marker="${escapeHtml(marker)}"><strong>${escapeHtml(marker)}</strong><small>Chart</small></button></th>${cells}<td class="lab-matrix-units">${escapeHtml(unitLabel)}</td><td class="lab-matrix-reference">${escapeHtml(reference)}</td></tr>`;
   }).join('');
-  el.innerHTML = `<div class="lab-results-matrix-wrap"><table class="lab-results-matrix"><thead><tr><th scope="col">Biomarker</th>${dates.map((date) => `<th scope="col">${escapeHtml(date)}</th>`).join('')}<th scope="col" class="lab-matrix-units">Units</th><th scope="col" class="lab-matrix-reference">Reference</th></tr></thead><tbody>${bodyRows}</tbody></table></div><p class="fine-print lab-matrix-note">H/L flags are from the report or inferred from its interval; * marks inferred flags.</p>`;
+  el.innerHTML = `<div class="lab-results-matrix-wrap"><table class="lab-results-matrix"><thead><tr><th scope="col">Biomarker</th>${dates.map((date) => `<th scope="col">${escapeHtml(date)}</th>`).join('')}<th scope="col" class="lab-matrix-units">Units</th><th scope="col" class="lab-matrix-reference">Reference</th></tr></thead><tbody>${bodyRows}</tbody></table></div>`;
   el.querySelectorAll('[data-open-marker]').forEach((button) => button.addEventListener('click', () => openLabDashboard(button.dataset.openMarker)));
   el.querySelectorAll('[data-remove-lab]').forEach((button) => button.addEventListener('click', () => { data.labs = data.labs.filter((lab) => lab.id !== button.dataset.removeLab); saveData(); renderLabs(); renderLocalCorrelations(); }));
 }
@@ -996,7 +996,7 @@ function renderLabPdfReview(rows, fileName) {
     const row = input.closest('[data-pdf-row]');
     body.querySelectorAll(`[data-marker-key="${CSS.escape(row.dataset.markerKey)}"] [data-field="reference"]`).forEach((peer) => { if (peer !== input) peer.value = input.value; });
   }));
-  document.getElementById('labPdfSummary').textContent = `${rows.length} possible result${rows.length === 1 ? '' : 's'} found in ${fileName}. Current results use the date in the filename when the report has no collection date. The first numeric reference interval seeds the chart's desired range only when you have not set one. Review markers, dates, values, units and references before adding.`;
+  document.getElementById('labPdfSummary').textContent = `${rows.length} possible result${rows.length === 1 ? '' : 's'} found in ${fileName}. Review markers, dates, values, units and references before adding.`;
   document.getElementById('labPdfReview').showModal();
 }
 
@@ -1072,6 +1072,7 @@ async function importLabs(file) {
   if (!file) return;
   if (/\.pdf$/i.test(file.name) || file.type === 'application/pdf') {
     const status = document.getElementById('labImportStatus');
+    status.hidden = false;
     status.textContent = 'Reading PDF text on this device…';
     try {
       const rows = await readPdfLabRows(file);

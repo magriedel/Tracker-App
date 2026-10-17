@@ -19,7 +19,7 @@
     <link rel="stylesheet" href="./routine-management.css?v=4" />
     <link rel="stylesheet" href="./analysis.css?v=1" />
     <link rel="stylesheet" href="./routine-edit.css?v=7" />
-    <link rel="stylesheet" href="./lab-pdf.css?v=6" />
+    <link rel="stylesheet" href="./lab-pdf.css?v=7" />
     <title>Thyroid Tracker</title>
   </head>
   <body>
@@ -63,8 +63,7 @@
 
         <section class="screen" id="screen-labs" role="tabpanel" aria-labelledby="tab-labs" hidden>
           <div class="screen-heading compact-heading"><h2>Labs</h2><button id="exportCsvBtn" class="button secondary small" type="button">Export CSV</button></div>
-          <div class="lab-toolbar"><label class="field compact-field"><span>Show timeframe</span><select id="labTimeFilter"><option value="all">All results</option><option value="90">Last 90 days</option><option value="365">Last year</option><option value="1825">Last 5 years</option></select></label></div>
-          <details class="lab-entry-details"><summary>＋ Add lab result</summary><form id="labForm" class="lab-form">
+          <div class="lab-toolbar"><label class="field compact-field"><span>Show timeframe</span><select id="labTimeFilter"><option value="all">All results</option><option value="90">Last 90 days</option><option value="365">Last year</option><option value="1825">Last 5 years</option></select></label><details class="lab-entry-details"><summary>＋ Add lab result</summary><form id="labForm" class="lab-form">
             <label class="field"><span>Marker</span><input id="labMarker" list="markerOptions" required placeholder="e.g. TSH" /><datalist id="markerOptions"><option>TSH</option><option>Free T4</option><option>Free T3</option><option>TRAb</option><option>TSI</option></datalist></label>
             <label class="field"><span>Result date</span><input id="labDate" type="date" required /></label>
             <label class="field"><span>Value</span><input id="labValue" type="number" step="any" required placeholder="Value" /></label>
@@ -72,8 +71,7 @@
             <label class="field"><span>Initial shared reference</span><input id="labReference" placeholder="Used when adding a new marker" /></label>
             <label class="field"><span>Desired low</span><input id="labDesiredLow" type="number" step="any" placeholder="Optional" /></label><label class="field"><span>Desired high</span><input id="labDesiredHigh" type="number" step="any" placeholder="Optional" /></label>
             <button class="button primary" type="submit">Add result</button>
-          </form></details>
-          <div class="import-row"><label class="button secondary small" for="labImport">Import PDF / CSV</label><input id="labImport" type="file" accept=".pdf,application/pdf,.csv,.txt,text/csv,text/plain" hidden /></div><p id="labImportStatus" class="fine-print" role="status">PDF text is extracted on this device. Scanned/image-only PDFs are not supported.</p>
+          </form></details><label class="button secondary small lab-import-button" for="labImport">Import PDF / CSV</label><input id="labImport" type="file" accept=".pdf,application/pdf,.csv,.txt,text/csv,text/plain" hidden /></div><p id="labImportStatus" class="fine-print" role="status" hidden></p>
           <div id="labDashboard" class="lab-dashboard"></div>
         </section>
 
@@ -97,6 +95,6 @@
       <dialog id="routineGroupMenu" class="routine-group-menu"><div class="dialog-heading"><div><p class="eyebrow">Routine tab</p><h2 id="routineGroupMenuTitle">Time of day</h2></div><button id="closeRoutineGroupMenu" class="icon-button" type="button" aria-label="Close tab menu">Done</button></div><div class="routine-group-menu-actions"><button id="renameRoutineGroup" class="button secondary" type="button">Rename tab</button><button id="deleteRoutineGroup" class="button danger-button" type="button">Delete tab</button></div></dialog>
       <div id="toast" class="toast" role="status" aria-live="polite"></div>
     </div>
-    <script type="module" src="./tracker.js?v=5"></script>
+    <script type="module" src="./tracker.js?v=6"></script>
   </body>
 </html>
