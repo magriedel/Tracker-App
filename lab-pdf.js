@@ -40,7 +40,12 @@ function linesFromText(text) {
 function splitAdjacentRows(line) {
   const markerStart = '(?:WBC|RBC|Hemoglobin|Hematocrit|MCV|MCH|MCHC|RDW|Platelets?|Neutrophils|Lymphs?|Monocytes|Eos|Basos|Immature Granulocytes|eGFR|BUN\\/Creatinine Ratio|Thyroxine|Free Thyroxine Index|Antiparietal Cell Antibody|Thyroid Peroxidase|TSH|Free T[34]|Total T[34])';
   const suffix = new RegExp(`(not\\s+estab\\.?|[<>]?\\s*-?\\d+(?:[.,]\\d+)?\\s*(?:-|\\u2013|\\u2014|to)\\s*[<>]?\\s*-?\\d+(?:[.,]\\d+)?|[<>]\\s*\\d+(?:[.,]\\d+)?)(?=${markerStart}\\b)`, 'ig');
-  return line.replace(suffix, '$1\n').split('\n').map((part) => part.trim()).filter(Boolean);
+  const starts = [...line.matchAll(new RegExp(`${markerStart}\\b(?=(?:\\s+(?:[a-z][a-z0-9()/.-]*|\\([^)]+\\))){0,5}\\s+(?:\\d{2}\\s+)?[<>]?\\s*\\d)`, 'ig'))].map((match) => match.index).filter((index) => index > 0);
+  const parts = [];
+  let start = 0;
+  starts.forEach((index) => { if (index > start) { parts.push(line.slice(start, index).trim()); start = index; } });
+  parts.push(line.slice(start).trim());
+  return parts.flatMap((part) => part.replace(suffix, '$1\n').split('\n').map((item) => item.trim()).filter(Boolean));
 }
 
 function parseOrphanLabcorpResult(line) {
@@ -102,18 +107,20 @@ function rangeFlag(value, reference) {
 }
 
 function parseLabcorpCbcLine(line, currentDate) {
-  const referencePattern = '(?:[<>]?\\s*-?\\d+(?:[.,]\\d+)?\\s*(?:-|\\u2013|\\u2014|to)\\s*[<>]?\\s*-?\\d+(?:[.,]\\d+)?|not\\s+estab\\.?|[<>]\\s*\\d+(?:[.,]\\d+)?)';
-  const unitPattern = '[a-zµμ%][a-z0-9µμ/^.-]*';
-  const match = line.match(new RegExp(`^(.+?)\\s+(?:\\d{2}\\s+)?([<>]?\\s*-?\\d+(?:[.,]\\d+)?)(?:\\s+(HIGH|LOW|H|L))?(?:\\s+([<>]?\\s*-?\\d+(?:[.,]\\d+)?)\\s+(\\d{1,2}[-/]\\d{1,2}[-/]\\d{2,4}))?\\s+(?:(${unitPattern})\\s+)?(${referencePattern})(?:\\s.*)?$`, 'i'));
+  const match = line.match(/^(.+?)\s+(?:\d{2}\s+)?([<>]?\s*-?\d+(?:[.,]\d+)?)(?:\s+(HIGH|LOW|H|L))?(?:\s+([<>]?\s*-?\d+(?:[.,]\d+)?)\s+(\d{1,2}[-/]\d{1,2}[-/]\d{2,4}))?\s+(.+)$/i);
   if (!match) return null;
-  const [, marker, currentRaw, explicitFlag, previousRaw, previousDate, units = '', referenceValue] = match;
-  if (units && !isLabUnit(units) && !/^x?10(?:e|\^)?\d+\/(?:u|µ)?l$/i.test(units.replace(/\s+/g, ''))) return null;
+  const [, marker, currentRaw, explicitFlag, previousRaw, previousDate, tail] = match;
   const toNumber = (value) => Number(value.replace(/\s/g, '').replace(',', '.'));
   const cleanMarker = marker.replace(/\s+/g, ' ').trim();
   if (!/[a-z]/i.test(cleanMarker)) return null;
   const currentValue = toNumber(currentRaw);
   if (!Number.isFinite(currentValue)) return null;
-  const cleanReference = referenceValue.trim();
+  const tailText = tail.trim();
+  const firstSpace = tailText.search(/\s/);
+  const firstToken = firstSpace < 0 ? tailText : tailText.slice(0, firstSpace);
+  const hasUnit = /[a-z%µμ]/i.test(firstToken) && !/^(?:high|low|h|l)$/i.test(firstToken);
+  const units = hasUnit ? firstToken : '';
+  const cleanReference = (hasUnit ? tailText.slice(firstToken.length) : tailText).trim();
   const derivedFlag = rangeFlag(currentValue, cleanReference);
   const reportFlag = /^H/i.test(explicitFlag || '') ? 'H' : /^L/i.test(explicitFlag || '') ? 'L' : '';
   const rows = [{ marker: cleanMarker, date: currentDate, value: currentValue, units, reference: cleanReference, flag: reportFlag || derivedFlag, flagSource: reportFlag ? 'report' : derivedFlag ? 'reference interval' : '', resultPeriod: 'Current' }];
@@ -121,6 +128,37 @@ function parseLabcorpCbcLine(line, currentDate) {
     const previousValue = toNumber(previousRaw);
     if (Number.isFinite(previousValue)) rows.push({ marker: cleanMarker, date: normalizeDate(previousDate), value: previousValue, units, reference: cleanReference, flag: '', flagSource: '', resultPeriod: 'Previous' });
   }
+  return rows;
+}
+
+function parseDatedLabcorpLine(line, currentDate) {
+  const dateMatch = DATE_PATTERN.exec(line);
+  if (!dateMatch) return null;
+  const prefix = line.slice(0, dateMatch.index).trim();
+  const suffix = line.slice(dateMatch.index + dateMatch[0].length).trim();
+  const tokens = [...prefix.matchAll(/\S+/g)].map((match) => ({ text: match[0], index: match.index }));
+  const numeric = tokens.map((token, index) => ({ ...token, tokenIndex: index, value: /^[<>]?\s*-?\d+(?:[.,]\d+)?$/.test(token.text) ? Number(token.text.replace(/[<>\s]/g, '').replace(',', '.')) : null })).filter((token) => token.value !== null && Number.isFinite(token.value));
+  if (!numeric.length) return null;
+  if (numeric.length > 1 && numeric[0].text === '01') numeric.shift();
+  const resultTokens = numeric.slice(-2);
+  const current = resultTokens[0];
+  const previous = resultTokens.length > 1 ? resultTokens[1] : null;
+  const marker = prefix.slice(0, current.index).replace(/\s+01\s*$/, '').trim();
+  if (marker.length < 2 || !/[a-z]/i.test(marker) || /\b(?:patient|accession|dob|date of birth|page)\b/i.test(marker)) return null;
+  const between = tokens.filter((token) => token.index > current.index && (!previous || token.index < previous.index)).map((token) => token.text);
+  const explicitFlag = between.find((token) => /^(?:high|low|h|l)$/i.test(token)) || '';
+  let units = '';
+  let reference = suffix;
+  const suffixTokens = suffix.split(/\s+/).filter(Boolean);
+  if (suffixTokens.length && /[a-z%µμ]/i.test(suffixTokens[0]) && !/^(?:high|low|h|l)$/i.test(suffixTokens[0])) {
+    units = suffixTokens.shift();
+    reference = suffixTokens.join(' ');
+  }
+  const currentDateValue = currentDate || '';
+  const reportFlag = /^H/i.test(explicitFlag) ? 'H' : /^L/i.test(explicitFlag) ? 'L' : '';
+  const derivedFlag = rangeFlag(current.value, reference);
+  const rows = [{ marker, date: currentDateValue, value: current.value, units, reference, flag: reportFlag || derivedFlag, flagSource: reportFlag ? 'report' : derivedFlag ? 'reference interval' : '', resultPeriod: 'Current' }];
+  if (previous) rows.push({ marker, date: normalizeDate(dateMatch[0]), value: previous.value, units, reference, flag: '', flagSource: '', resultPeriod: 'Previous' });
   return rows;
 }
 
@@ -133,8 +171,7 @@ function candidateForLine(line, reportDate) {
     if (!match) continue;
     const tail = line.slice(match.index + match[0].length).replace(DATE_PATTERN, ' ');
     const details = extractValueTail(tail);
-    if (!details || DOSE_UNITS.test(details.units)) return null;
-    if (details.units && !isLabUnit(details.units)) return null;
+    if (!details) return null;
     return { marker, date, ...details };
   }
   const numeric = firstNumber(line);
@@ -143,7 +180,7 @@ function candidateForLine(line, reportDate) {
   if (marker.length < 2 || marker.length > 60 || !/[a-z]/i.test(marker) || DATE_PATTERN.test(marker)) return null;
   if (/\b(?:page|phone|fax|zip|account|patient|specimen|accession|collected|reported|reference|range|result|date|dob)\b/i.test(marker)) return null;
   const details = extractValueTail(line.slice(numeric.index));
-  return details && isLabUnit(details.units) ? { marker, date, ...details } : null;
+  return details ? { marker, date, ...details } : null;
 }
 
 export function parseLabLines(rawLines) {
@@ -170,6 +207,14 @@ export function parseLabLines(rawLines) {
         if (!seen.has(key)) { seen.add(key); rows.push(row); }
       }
       orphan = null;
+      continue;
+    }
+    const dated = parseDatedLabcorpLine(line, reportDate);
+    if (dated) {
+      for (const row of dated) {
+        const key = [row.marker.toLowerCase(), row.date, row.value, row.units.toLowerCase()].join('|');
+        if (!seen.has(key)) { seen.add(key); rows.push(row); }
+      }
       continue;
     }
     const structured = parseLabcorpCbcLine(line, reportDate);

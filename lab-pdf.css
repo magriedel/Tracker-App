@@ -14,3 +14,8 @@
 .lab-pdf-table input[type=checkbox]{width:18px;height:18px;accent-color:var(--green)}
 .lab-pdf-actions{display:flex;justify-content:flex-end;flex-wrap:wrap;gap:8px;margin-top:12px}
 #labImportStatus{margin:8px 0;color:var(--muted);line-height:1.4}
+.lab-reference-row th{vertical-align:middle}
+.lab-reference-row td{padding-block:7px}
+.lab-reference-control{display:grid;grid-template-columns:auto minmax(140px,1fr);align-items:center;gap:10px;color:var(--muted);font-size:.75rem}
+.lab-reference-control input{width:100%;min-width:140px;min-height:36px;padding:6px 8px;border:1px solid var(--line);border-radius:6px;background:#fff;color:var(--ink);font:inherit}
+@media(max-width:560px){.lab-reference-control{grid-template-columns:1fr;gap:4px}}

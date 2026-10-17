@@ -75,6 +75,11 @@ function loadData() {
 }
 
 const data = loadData();
+data.labReferences ||= {};
+(data.labs || []).forEach((lab) => {
+  const key = lab.marker.trim().toLowerCase();
+  if (!data.labReferences[key] && lab.reference) data.labReferences[key] = lab.reference;
+});
 let activeDate = today();
 let recognition = null;
 let toastTimer;
@@ -93,7 +98,7 @@ let pendingLabRows = [];
 
 function saveData() {
   const submittedDays = Object.fromEntries(Object.entries(data.days).filter(([, day]) => day.submitted || Object.keys(day.parts || {}).length).map(([date, day]) => [date, { submitted: day.submitted, submissionHistory: day.submissionHistory || [], parts: day.parts || {} }]));
-  localStorage.setItem(STORAGE_KEY, JSON.stringify({ days: submittedDays, labs: data.labs || [], customItems: data.customItems || [], customSymptoms: data.customSymptoms || [], doseOverrides: data.doseOverrides || {}, routineOverrides: data.routineOverrides || {}, deletedRoutineItems: data.deletedRoutineItems || [], routineGroups: routineGroups(), desiredRanges: data.desiredRanges || {}, healthByDate: data.healthByDate || {}, puzzle: { ...data.puzzle, rating: undefined } }));
+  localStorage.setItem(STORAGE_KEY, JSON.stringify({ days: submittedDays, labs: data.labs || [], labReferences: data.labReferences || {}, customItems: data.customItems || [], customSymptoms: data.customSymptoms || [], doseOverrides: data.doseOverrides || {}, routineOverrides: data.routineOverrides || {}, deletedRoutineItems: data.deletedRoutineItems || [], routineGroups: routineGroups(), desiredRanges: data.desiredRanges || {}, healthByDate: data.healthByDate || {}, puzzle: { ...data.puzzle, rating: undefined } }));
 }
 
 function previousDay(date) { const day = new Date(`${date}T12:00:00`); day.setDate(day.getDate() - 1); return `${day.getFullYear()}-${String(day.getMonth() + 1).padStart(2, '0')}-${String(day.getDate()).padStart(2, '0')}`; }
@@ -852,6 +857,20 @@ function withinTimeframe(labs, days) {
   return labs.filter((lab) => new Date(`${lab.date}T23:59:59`) >= cutoff);
 }
 
+function markerReferenceKey(marker) { return marker.trim().toLowerCase(); }
+function hasMarkerReference(marker) { return Object.hasOwn(data.labReferences || {}, markerReferenceKey(marker)); }
+function markerReference(marker) {
+  const key = markerReferenceKey(marker);
+  if (Object.hasOwn(data.labReferences || {}, key)) return data.labReferences[key] || '';
+  return data.labs.find((lab) => markerReferenceKey(lab.marker) === key && lab.reference)?.reference || '';
+}
+function saveMarkerReference(marker, value) {
+  const key = markerReferenceKey(marker);
+  data.labReferences ||= {};
+  data.labReferences[key] = value.trim();
+  data.labs.forEach((lab) => { if (markerReferenceKey(lab.marker) === key) lab.reference = value.trim(); });
+  saveData();
+}
 function markerRange(marker) { return data.desiredRanges?.[marker.trim().toLowerCase()] || {}; }
 function labRangeState(lab, range) {
   const low = range.low === '' || range.low === undefined ? null : Number(range.low);
@@ -866,9 +885,10 @@ function renderLabs() {
   if (!groups.length) { el.innerHTML = '<div class="empty-state">No results in this time period. Try a wider filter or add a result.</div>'; return; }
   el.innerHTML = groups.map((entries) => {
     const newestFirst = entries.slice().reverse(); const range = markerRange(entries[0].marker);
-    return `<section class="marker-table-section"><button class="marker-open" type="button" data-open-marker="${escapeHtml(entries[0].marker)}"><span class="marker-chevron">↗</span><span><strong>${escapeHtml(entries[0].marker)}</strong><small>Tap for chart · ${range.low !== undefined || range.high !== undefined ? `desired ${escapeHtml(range.low ?? '—')}–${escapeHtml(range.high ?? '—')}` : 'set desired range'}</small></span></button><div class="lab-table-wrap"><table class="lab-table"><thead><tr><th>Result</th>${newestFirst.map((lab) => `<th>${escapeHtml(lab.date)}</th>`).join('')}</tr></thead><tbody><tr><th>Value</th>${newestFirst.map((lab, index) => { const previous = newestFirst[index + 1]; const delta = previous ? Number(lab.value) - Number(previous.value) : null; const state = labRangeState(lab, range); return `<td class="${state}"><strong>${escapeHtml(lab.value)}</strong><small>${escapeHtml(lab.units)}</small><span class="range-state ${state}">${state === 'in-range' ? 'In range' : state === 'out-range' ? 'Out of range' : 'Not set'}</span>${delta !== null ? `<small class="lab-delta">${delta > 0 ? '+' : ''}${escapeHtml(delta.toFixed(2))} vs prior</small>` : '<small class="lab-delta">Baseline</small>'}<button type="button" class="text-button" data-remove-lab="${escapeHtml(lab.id)}" aria-label="Remove result from ${escapeHtml(lab.date)}">Remove</button></td>`; }).join('')}</tr></tbody></table></div></section>`;
+    return `<section class="marker-table-section"><button class="marker-open" type="button" data-open-marker="${escapeHtml(entries[0].marker)}"><span class="marker-chevron">↗</span><span><strong>${escapeHtml(entries[0].marker)}</strong><small>Tap for chart · ${range.low !== undefined || range.high !== undefined ? `desired ${escapeHtml(range.low ?? '—')}–${escapeHtml(range.high ?? '—')}` : 'set desired range'}</small></span></button><div class="lab-table-wrap"><table class="lab-table"><thead><tr><th>Result</th>${newestFirst.map((lab) => `<th>${escapeHtml(lab.date)}</th>`).join('')}</tr></thead><tbody><tr><th>Value</th>${newestFirst.map((lab, index) => { const previous = newestFirst[index + 1]; const delta = previous ? Number(lab.value) - Number(previous.value) : null; const state = labRangeState(lab, range); return `<td class="${state}"><strong>${escapeHtml(lab.value)}${lab.flag ? ` ${escapeHtml(lab.flag)}` : ''}</strong><small>${escapeHtml(lab.units)}</small><span class="range-state ${state}">${state === 'in-range' ? 'In range' : state === 'out-range' ? 'Out of range' : 'Not set'}</span>${delta !== null ? `<small class="lab-delta">${delta > 0 ? '+' : ''}${escapeHtml(delta.toFixed(2))} vs prior</small>` : '<small class="lab-delta">Baseline</small>'}<button type="button" class="text-button" data-remove-lab="${escapeHtml(lab.id)}" aria-label="Remove result from ${escapeHtml(lab.date)}">Remove</button></td>`; }).join('')}</tr><tr class="lab-reference-row"><th>Reference</th><td colspan="${newestFirst.length}"><label class="lab-reference-control"><span>Consistent reference interval for ${escapeHtml(entries[0].marker)}</span><input type="text" data-marker-reference="${escapeHtml(entries[0].marker)}" value="${escapeHtml(markerReference(entries[0].marker))}" placeholder="Set a reference interval" /></label></td></tr></tbody></table></div></section>`;
   }).join('');
   el.querySelectorAll('[data-open-marker]').forEach((button) => button.addEventListener('click', () => openLabDashboard(button.dataset.openMarker)));
+  el.querySelectorAll('[data-marker-reference]').forEach((input) => input.addEventListener('change', () => saveMarkerReference(input.dataset.markerReference, input.value)));
   el.querySelectorAll('[data-remove-lab]').forEach((button) => button.addEventListener('click', () => { data.labs = data.labs.filter((lab) => lab.id !== button.dataset.removeLab); saveData(); renderLabs(); renderLocalCorrelations(); }));
 }
 
@@ -908,7 +928,11 @@ function saveMarkerRange() {
 function addLab(event) {
   event.preventDefault();
   const marker = document.getElementById('labMarker').value.trim();
-  data.labs.push({ id: uniqueId('lab'), marker, date: document.getElementById('labDate').value, value: Number(document.getElementById('labValue').value), units: document.getElementById('labUnits').value.trim(), reference: document.getElementById('labReference').value.trim() });
+  const key = markerReferenceKey(marker);
+  const reference = hasMarkerReference(marker) ? markerReference(marker) : document.getElementById('labReference').value.trim();
+  data.labReferences ||= {};
+  if (reference && !data.labReferences[key]) data.labReferences[key] = reference;
+  data.labs.push({ id: uniqueId('lab'), marker, date: document.getElementById('labDate').value, value: Number(document.getElementById('labValue').value), units: document.getElementById('labUnits').value.trim(), reference });
   data.desiredRanges ||= {};
   const low = document.getElementById('labDesiredLow').value, high = document.getElementById('labDesiredHigh').value;
   if (low !== '' || high !== '') data.desiredRanges[marker.toLowerCase()] = { low: low === '' ? undefined : Number(low), high: high === '' ? undefined : Number(high) };
@@ -930,9 +954,37 @@ function parseLabText(text) {
 
 function renderLabPdfReview(rows, fileName) {
   const body = document.getElementById('labPdfRows');
-  body.innerHTML = rows.map((row, index) => `<tr data-pdf-row="${index}" data-flag="${escapeHtml(row.flag || '')}" data-flag-source="${escapeHtml(row.flagSource || '')}"><td><input type="checkbox" data-field="include" checked aria-label="Import ${escapeHtml(row.marker)} ${escapeHtml(row.resultPeriod || '')}" /></td><td>${escapeHtml(row.resultPeriod || 'Result')}</td><td><input type="text" data-field="marker" value="${escapeHtml(row.marker)}" aria-label="Marker" /></td><td><input type="date" data-field="date" value="${escapeHtml(row.date)}" aria-label="Result date" /></td><td><input type="number" step="any" data-field="value" value="${escapeHtml(row.value)}" aria-label="Result value" /></td><td>${escapeHtml(row.flag ? `${row.flag}${row.flagSource === 'reference interval' ? ' *' : ''}` : '—')}</td><td><input type="text" data-field="units" value="${escapeHtml(row.units)}" aria-label="Units" /></td><td><input type="text" data-field="reference" value="${escapeHtml(row.reference)}" aria-label="Reference range" /></td></tr>`).join('');
-  document.getElementById('labPdfSummary').textContent = `${rows.length} possible result${rows.length === 1 ? '' : 's'} found in ${fileName}. Check and correct each row before adding. H/L flags are kept when present in text; * means inferred from the printed reference interval. PDF bold styling and alert icons may not be extractable from text.`;
+  const references = new Map();
+  rows.forEach((row) => {
+    const key = markerReferenceKey(row.marker);
+    const savedReference = hasMarkerReference(row.marker) ? markerReference(row.marker) : references.get(key) || row.reference || '';
+    references.set(key, savedReference);
+  });
+  body.innerHTML = rows.map((row, index) => {
+    const key = markerReferenceKey(row.marker);
+    const reference = references.get(key);
+    return `<tr data-pdf-row="${index}" data-marker-key="${escapeHtml(key)}" data-flag="${escapeHtml(row.flag || '')}" data-flag-source="${escapeHtml(row.flagSource || '')}"><td><input type="checkbox" data-field="include" checked aria-label="Import ${escapeHtml(row.marker)} ${escapeHtml(row.resultPeriod || '')}" /></td><td>${escapeHtml(row.resultPeriod || 'Result')}</td><td><input type="text" data-field="marker" value="${escapeHtml(row.marker)}" aria-label="Marker" /></td><td><input type="date" data-field="date" value="${escapeHtml(row.date)}" aria-label="Result date" /></td><td><input type="number" step="any" data-field="value" value="${escapeHtml(row.value)}" aria-label="Result value" /></td><td>${escapeHtml(row.flag ? `${row.flag}${row.flagSource === 'reference interval' ? ' *' : ''}` : '—')}</td><td><input type="text" data-field="units" value="${escapeHtml(row.units)}" aria-label="Units" /></td><td><input type="text" data-field="reference" value="${escapeHtml(reference)}" aria-label="Reference range for ${escapeHtml(row.marker)}" /></td></tr>`;
+  }).join('');
+  body.querySelectorAll('[data-field="reference"]').forEach((input) => input.addEventListener('input', () => {
+    const row = input.closest('[data-pdf-row]');
+    body.querySelectorAll(`[data-marker-key="${CSS.escape(row.dataset.markerKey)}"] [data-field="reference"]`).forEach((peer) => { if (peer !== input) peer.value = input.value; });
+  }));
+  document.getElementById('labPdfSummary').textContent = `${rows.length} possible result${rows.length === 1 ? '' : 's'} found in ${fileName}. Review the marker, date, value, units and shared reference per marker before adding. Existing app references replace differing report ranges; edit a reference here to change it consistently. H/L flags are preserved when readable.`;
   document.getElementById('labPdfReview').showModal();
+}
+
+function applyCanonicalLabReferences(rows, useProvidedReference = false) {
+  const references = new Map();
+  rows.forEach((row) => {
+    const key = markerReferenceKey(row.marker);
+    if (!references.has(key)) references.set(key, !useProvidedReference && hasMarkerReference(row.marker) ? markerReference(row.marker) : row.reference || '');
+  });
+  references.forEach((reference, key) => {
+    data.labReferences ||= {};
+    data.labReferences[key] = reference;
+    data.labs.forEach((lab) => { if (markerReferenceKey(lab.marker) === key) lab.reference = reference; });
+  });
+  rows.forEach((row) => { row.reference = references.get(markerReferenceKey(row.marker)) ?? row.reference ?? ''; });
 }
 
 function confirmLabPdfImport() {
@@ -945,6 +997,10 @@ function confirmLabPdfImport() {
     if (!marker || !date || field('value') === '' || !Number.isFinite(value)) { toast('Each selected result needs a marker, date and numeric value.'); return; }
     imported.push({ id: uniqueId('lab-pdf'), marker, date, value, units: field('units'), reference: field('reference'), flag: row.dataset.flag || '', flagSource: row.dataset.flagSource || '' });
   }
+  selected.forEach((row, index) => {
+    imported[index].reference = row.querySelector('[data-field="reference"]').value.trim();
+  });
+  applyCanonicalLabReferences(imported, true);
   data.labs.push(...imported);
   saveData(); renderLabs(); renderLocalCorrelations();
   document.getElementById('labPdfReview').close();
@@ -972,7 +1028,7 @@ async function importLabs(file) {
   }
   if (!/\.(csv|txt)$/i.test(file.name)) { toast('Choose a PDF, CSV, or text file.'); return; }
   const reader = new FileReader();
-  reader.onload = () => { const rows = parseLabText(String(reader.result)); if (!rows.length) { toast('No rows recognized. Use marker,date,value,units,reference columns.'); return; } data.labs.push(...rows); saveData(); renderLabs(); renderLocalCorrelations(); toast(`${rows.length} results imported locally.`); };
+  reader.onload = () => { const rows = parseLabText(String(reader.result)); if (!rows.length) { toast('No rows recognized. Use marker,date,value,units,reference columns.'); return; } applyCanonicalLabReferences(rows); data.labs.push(...rows); saveData(); renderLabs(); renderLocalCorrelations(); toast(`${rows.length} results imported locally.`); };
   reader.readAsText(file);
 }
 
