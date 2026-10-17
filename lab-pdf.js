@@ -27,6 +27,22 @@ const MARKER_ALIASES = [
 ];
 const normalizeMarkerText = (marker) => String(marker ?? '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim().replace(/\s+/g, ' ');
 const MARKER_ALIAS_MAP = new Map(MARKER_ALIASES.flatMap(([canonical, aliases]) => aliases.map((alias) => [normalizeMarkerText(alias), canonical])));
+const BIOMARKER_PATTERNS = [
+  /^(?:wbc|white blood cells?|leukocytes?|rbc|red blood cells?|erythrocytes?|hemoglobin|haemoglobin|hematocrit|haematocrit|packed cell volume|mcv|mch|mchc|rdw|platelets?|platelet count|neutrophils?(?: absolute| percent| #)?|lymphs?(?: absolute| percent| #)?|lymphocytes?(?: absolute| percent| #)?|monocytes?(?: absolute| percent| #)?|eos(?: absolute| percent| #)?|eosinophils?(?: absolute| percent| #)?|basos?(?: absolute| percent| #)?|basophils?(?: absolute| percent| #)?|immature granulocytes?(?: absolute| percent| #)?|nucleated red blood cells?)$/,
+  /^(?:glucose|bun|blood urea nitrogen|urea nitrogen|creatinine|bun creatinine ratio|bun creatinine|egfr|estimated glomerular filtration rate|sodium|potassium|chloride|carbon dioxide|co2|calcium|protein total|total protein|albumin|globulin|a g ratio|albumin globulin ratio|bilirubin(?: total| direct| indirect)?|alkaline phosphatase|alk phos|ast|sgot|aspartate aminotransferase|alt|sgpt|alanine aminotransferase|ggt|gamma glutamyl transferase|anion gap|osmolality)$/,
+  /^(?:cholesterol(?: total)?|total cholesterol|triglycerides?|hdl(?: cholesterol)?|ldl(?: cholesterol)?|vldl(?: cholesterol)?|non hdl cholesterol|apolipoprotein [ab]|lipoprotein a)$/,
+  /^(?:tsh|thyroid stimulating hormone(?: tsh)?|thyrotropin|ultrasensitive tsh|tsh ultrasensitive|sensitive tsh|tsh ultrasensible|hormona estimulante de la tiroides|hormona estimulante tiroidea|hormona estimulante tiroides|free t[34]|total t[34]|t[34] free|t[34] total|ft[34]|t[34] libre|t[34]l|thyroxine(?: \(t4\))?|free thyroxine|free thyroxine index|thyroxine binding globulin|t3 uptake|t4 uptake|tpo(?: ab| antibodies?)?|thyroid peroxidase(?: \(tpo\))?(?: ab| antibodies?)?|thyroglobulin(?: ab| antibodies?)?|anti tpo(?: antibodies?)?|antiparietal cell antibody|parietal cell antibodies?|thyroid stimulating immunoglobulin|tsi|trab|tsh receptor antibodies?)$/,
+  /^(?:vitamin d(?: 25 hydroxy| 25 oh)?|25 oh vitamin d|25 hydroxy vitamin d|vitamin b12|b12|folate|folic acid|ferritin|iron|iron binding capacity|tibc|transferrin|transferrin saturation|iron saturation|magnesium|phosphorus|phosphate|zinc|copper)$/,
+  /^(?:c reactive protein|crp|high sensitivity crp|hs crp|esr|sedimentation rate|erythrocyte sedimentation rate|ana|antinuclear antibodies?|rheumatoid factor|rf|complement c[34])$/,
+  /^(?:insulin|c peptide|cortisol|testosterone(?: total| free)?|estradiol|progesterone|dhea(?: s)?|lh|luteinizing hormone|fsh|follicle stimulating hormone|prolactin|shbg|sex hormone binding globulin|pth|parathyroid hormone|igf 1|growth hormone)$/
+];
+
+export function isBiomarkerName(marker) {
+  const normalized = normalizeMarkerText(marker).replace(/\s+\d{2}$/, '');
+  if (!normalized || /^(?:name|age|sex|gender|dob|date|page|patient|specimen|accession|reference|result|test)$/.test(normalized)) return false;
+  if (MARKER_ALIAS_MAP.has(normalized)) return true;
+  return BIOMARKER_PATTERNS.some((pattern) => pattern.test(normalized));
+}
 
 export function canonicalLabMarker(marker) {
   const original = String(marker ?? '').trim();
@@ -84,7 +100,7 @@ function parseOrphanLabcorpResult(line) {
 
 function isMarkerOnlyLine(line) {
   const marker = line.replace(/\s+\d{2}$/, '').trim();
-  return marker.length >= 3 && /[a-z]/i.test(marker) && !DATE_PATTERN.test(marker) && !/^[-+]?\d/.test(marker) && !/\b(?:reference interval|not estab)\b/i.test(marker);
+  return marker.length >= 3 && isBiomarkerName(marker) && !DATE_PATTERN.test(marker) && !/^[-+]?\d/.test(marker);
 }
 
 function rowsFromOrphan(marker, orphan, currentDate) {
@@ -135,7 +151,7 @@ function parseLabcorpCbcLine(line, currentDate) {
   const [, marker, currentRaw, explicitFlag, previousRaw, previousDate, tail] = match;
   const toNumber = (value) => Number(value.replace(/\s/g, '').replace(',', '.'));
   const cleanMarker = marker.replace(/\s+/g, ' ').trim();
-  if (!/[a-z]/i.test(cleanMarker)) return null;
+  if (!isBiomarkerName(cleanMarker)) return null;
   const currentValue = toNumber(currentRaw);
   if (!Number.isFinite(currentValue)) return null;
   const tailText = tail.trim();
@@ -167,7 +183,7 @@ function parseDatedLabcorpLine(line, currentDate) {
   const current = resultTokens[0];
   const previous = resultTokens.length > 1 ? resultTokens[1] : null;
   const marker = prefix.slice(0, current.index).replace(/\s+01\s*$/, '').trim();
-  if (marker.length < 2 || !/[a-z]/i.test(marker) || /\b(?:patient|accession|dob|date of birth|page)\b/i.test(marker)) return null;
+  if (!isBiomarkerName(marker)) return null;
   const between = tokens.filter((token) => token.index > current.index && (!previous || token.index < previous.index)).map((token) => token.text);
   const explicitFlag = between.find((token) => /^(?:high|low|h|l)$/i.test(token)) || '';
   let units = '';
@@ -200,7 +216,7 @@ function candidateForLine(line, reportDate) {
   const numeric = firstNumber(line);
   if (!numeric) return null;
   const marker = line.slice(0, numeric.index).replace(/[|,:;\s-]+$/g, '').replace(/^[|,:;\s-]+/g, '').trim();
-  if (marker.length < 2 || marker.length > 60 || !/[a-z]/i.test(marker) || DATE_PATTERN.test(marker)) return null;
+  if (marker.length > 60 || !isBiomarkerName(marker) || DATE_PATTERN.test(marker)) return null;
   if (/\b(?:page|phone|fax|zip|account|patient|specimen|accession|collected|reported|reference|range|result|date|dob)\b/i.test(marker)) return null;
   const details = extractValueTail(line.slice(numeric.index));
   return details ? { marker, date, ...details } : null;
@@ -232,6 +248,7 @@ export function parseLabLines(rawLines) {
       orphan = null;
       continue;
     }
+    if (/^.+\s+\d{2}$/.test(line) && isBiomarkerName(line.replace(/\s+\d{2}$/, ''))) continue;
     const dated = parseDatedLabcorpLine(line, reportDate);
     if (dated) {
       for (const row of dated) {
