@@ -897,7 +897,6 @@ function renderLabs() {
   const bodyRows = groups.map((entries) => {
     const newestFirst = entries.slice().reverse();
     const marker = canonicalLabMarker(entries[0].marker);
-    const range = markerRange(marker);
     const units = [...new Set(entries.map((lab) => lab.units).filter(Boolean))];
     const unitLabel = units.length > 1 ? 'Varies' : units[0] || '—';
     const reference = markerReference(marker) || entries.find((lab) => lab.reference)?.reference || '—';
@@ -910,8 +909,7 @@ function renderLabs() {
       }).join('');
       return `<td class="lab-date-cell">${values}</td>`;
     }).join('');
-    const desired = range.low !== undefined || range.high !== undefined ? `desired ${escapeHtml(range.low ?? '—')}–${escapeHtml(range.high ?? '—')}` : 'set desired range';
-    return `<tr><th scope="row"><button class="lab-marker-link" type="button" data-open-marker="${escapeHtml(marker)}"><strong>${escapeHtml(marker)}</strong><small>${desired} · chart</small></button></th>${cells}<td class="lab-matrix-units">${escapeHtml(unitLabel)}</td><td class="lab-matrix-reference">${escapeHtml(reference)}</td></tr>`;
+    return `<tr><th scope="row"><button class="lab-marker-link" type="button" data-open-marker="${escapeHtml(marker)}"><strong>${escapeHtml(marker)}</strong><small>Chart</small></button></th>${cells}<td class="lab-matrix-units">${escapeHtml(unitLabel)}</td><td class="lab-matrix-reference">${escapeHtml(reference)}</td></tr>`;
   }).join('');
   el.innerHTML = `<div class="lab-results-matrix-wrap"><table class="lab-results-matrix"><thead><tr><th scope="col">Biomarker</th>${dates.map((date) => `<th scope="col">${escapeHtml(date)}</th>`).join('')}<th scope="col" class="lab-matrix-units">Units</th><th scope="col" class="lab-matrix-reference">Reference</th></tr></thead><tbody>${bodyRows}</tbody></table></div><p class="fine-print lab-matrix-note">H/L flags are from the report or inferred from its interval; * marks inferred flags.</p>`;
   el.querySelectorAll('[data-open-marker]').forEach((button) => button.addEventListener('click', () => openLabDashboard(button.dataset.openMarker)));
@@ -955,9 +953,9 @@ function addLab(event) {
   event.preventDefault();
   const marker = canonicalLabMarker(document.getElementById('labMarker').value.trim());
   const key = markerReferenceKey(marker);
-  const reference = hasMarkerReference(marker) ? markerReference(marker) : document.getElementById('labReference').value.trim();
+  const reference = markerReference(marker) || document.getElementById('labReference').value.trim() || 'Not Estab.';
   data.labReferences ||= {};
-  if (reference && !data.labReferences[key]) data.labReferences[key] = reference;
+  if (!data.labReferences[key]) data.labReferences[key] = reference;
   data.labs.push({ id: uniqueId('lab'), marker, date: document.getElementById('labDate').value, value: Number(document.getElementById('labValue').value), units: document.getElementById('labUnits').value.trim(), reference });
   data.desiredRanges ||= {};
   const low = document.getElementById('labDesiredLow').value, high = document.getElementById('labDesiredHigh').value;
@@ -984,9 +982,11 @@ function renderLabPdfReview(rows, fileName) {
   const references = new Map();
   rows.forEach((row) => {
     const key = markerReferenceKey(row.marker);
-    const savedReference = hasMarkerReference(row.marker) ? markerReference(row.marker) : references.get(key) || row.reference || '';
-    references.set(key, savedReference);
+    const savedReference = markerReference(row.marker);
+    if (savedReference && savedReference !== 'Not Estab.') references.set(key, savedReference);
+    else if (!references.get(key) && row.reference) references.set(key, row.reference);
   });
+  rows.forEach((row) => { const key = markerReferenceKey(row.marker); if (!references.get(key)) references.set(key, 'Not Estab.'); });
   body.innerHTML = rows.map((row, index) => {
     const key = markerReferenceKey(row.marker);
     const reference = references.get(key);
@@ -1005,8 +1005,11 @@ function applyCanonicalLabReferences(rows, useProvidedReference = false) {
   rows.forEach((row) => {
     row.marker = canonicalLabMarker(row.marker);
     const key = markerReferenceKey(row.marker);
-    if (!references.has(key)) references.set(key, !useProvidedReference && hasMarkerReference(row.marker) ? markerReference(row.marker) : row.reference || '');
+    const savedReference = !useProvidedReference ? markerReference(row.marker) : '';
+    if (savedReference && savedReference !== 'Not Estab.') references.set(key, savedReference);
+    else if (!references.get(key) && row.reference) references.set(key, row.reference);
   });
+  rows.forEach((row) => { const key = markerReferenceKey(row.marker); if (!references.get(key)) references.set(key, 'Not Estab.'); });
   references.forEach((reference, key) => {
     data.labReferences ||= {};
     data.labReferences[key] = reference;
@@ -1029,6 +1032,7 @@ function hasDesiredRange(key) {
 
 function referenceBounds(reference) {
   const text = String(reference || '').replace(/,/g, '.');
+  if (/^\s*not\s+estab\.?\s*$/i.test(text)) return null;
   const interval = text.match(/([<>]?\s*-?\d+(?:\.\d+)?)\s*(?:-|\u2013|\u2014|\bto\b)\s*([<>]?\s*-?\d+(?:\.\d+)?)/i);
   if (interval) {
     const low = Number(interval[1].replace(/[<>\s]/g, ''));
