@@ -2,7 +2,7 @@ import { Chess } from './chess-engine.js';
 import { interpretQuickUpdate } from './quick-update.js';
 import { renderAnalysis } from './analysis.js';
 import { WISDOM } from './wisdom.js';
-import { readPdfLabRows } from './lab-pdf.js';
+import { canonicalLabMarker, labMarkerIdentity, readPdfLabRows } from './lab-pdf.js';
 
 const STORAGE_KEY = 'thyroid-tracker-v2';
 const LEGACY_KEY = 'thyroid-tracker-local-data-v1';
@@ -75,10 +75,20 @@ function loadData() {
 }
 
 const data = loadData();
-data.labReferences ||= {};
+const storedLabReferences = data.labReferences || {};
+data.labReferences = {};
+Object.entries(storedLabReferences).forEach(([marker, reference]) => {
+  const key = labMarkerIdentity(marker);
+  if (!Object.hasOwn(data.labReferences, key)) data.labReferences[key] = reference;
+});
 (data.labs || []).forEach((lab) => {
-  const key = lab.marker.trim().toLowerCase();
+  const key = labMarkerIdentity(lab.marker);
   if (!data.labReferences[key] && lab.reference) data.labReferences[key] = lab.reference;
+});
+data.desiredRanges ||= {};
+Object.entries(data.desiredRanges).forEach(([marker, range]) => {
+  const key = labMarkerIdentity(marker);
+  if (key !== marker && !Object.hasOwn(data.desiredRanges, key)) data.desiredRanges[key] = range;
 });
 let activeDate = today();
 let recognition = null;
@@ -847,8 +857,8 @@ function addItem() {
 
 function groupLabs() {
   const grouped = new Map();
-  data.labs.forEach((lab) => { const key = lab.marker.trim().toLowerCase(); if (!grouped.has(key)) grouped.set(key, []); grouped.get(key).push(lab); });
-  return [...grouped.entries()].sort(([a], [b]) => a.localeCompare(b)).map(([, entries]) => entries.sort((a, b) => a.date.localeCompare(b.date)));
+  data.labs.forEach((lab) => { const key = labMarkerIdentity(lab.marker); if (!grouped.has(key)) grouped.set(key, []); grouped.get(key).push(lab); });
+  return [...grouped.entries()].sort(([a], [b]) => a.localeCompare(b)).map(([, entries]) => entries.sort((a, b) => a.date.localeCompare(b.date)).map((lab) => ({ ...lab, marker: canonicalLabMarker(lab.marker) })));
 }
 
 function withinTimeframe(labs, days) {
@@ -857,7 +867,7 @@ function withinTimeframe(labs, days) {
   return labs.filter((lab) => new Date(`${lab.date}T23:59:59`) >= cutoff);
 }
 
-function markerReferenceKey(marker) { return marker.trim().toLowerCase(); }
+function markerReferenceKey(marker) { return labMarkerIdentity(marker); }
 function hasMarkerReference(marker) { return Object.hasOwn(data.labReferences || {}, markerReferenceKey(marker)); }
 function markerReference(marker) {
   const key = markerReferenceKey(marker);
@@ -871,7 +881,7 @@ function saveMarkerReference(marker, value) {
   data.labs.forEach((lab) => { if (markerReferenceKey(lab.marker) === key) lab.reference = value.trim(); });
   saveData();
 }
-function markerRange(marker) { return data.desiredRanges?.[marker.trim().toLowerCase()] || {}; }
+function markerRange(marker) { return data.desiredRanges?.[markerReferenceKey(marker)] || {}; }
 function labRangeState(lab, range) {
   const low = range.low === '' || range.low === undefined ? null : Number(range.low);
   const high = range.high === '' || range.high === undefined ? null : Number(range.high);
@@ -905,7 +915,7 @@ function openLabDashboard(marker) {
 function drawLabGraph() {
   const container = document.getElementById('labGraph');
   const days = document.getElementById('detailTimeFilter').value;
-  const values = withinTimeframe(data.labs.filter((lab) => lab.marker.trim().toLowerCase() === selectedLabMarker.trim().toLowerCase()), days).sort((a, b) => a.date.localeCompare(b.date));
+  const values = withinTimeframe(data.labs.filter((lab) => markerReferenceKey(lab.marker) === markerReferenceKey(selectedLabMarker)), days).sort((a, b) => a.date.localeCompare(b.date));
   if (!values.length) { container.innerHTML = '<div class="empty-state">No results in this time period.</div>'; return; }
   const width = 680, height = 280, pad = { left: 54, right: 22, top: 25, bottom: 45 };
   const numbers = values.map((lab) => Number(lab.value)); const range = markerRange(selectedLabMarker); [range.low, range.high].forEach((value) => { if (value !== undefined && value !== '' && Number.isFinite(Number(value))) numbers.push(Number(value)); });
@@ -921,13 +931,13 @@ function saveMarkerRange() {
   const lowText = document.getElementById('detailDesiredLow').value, highText = document.getElementById('detailDesiredHigh').value;
   if (lowText !== '' && highText !== '' && Number(lowText) > Number(highText)) { toast('Desired low must be at or below desired high.'); return; }
   data.desiredRanges ||= {};
-  data.desiredRanges[selectedLabMarker.trim().toLowerCase()] = { low: lowText === '' ? undefined : Number(lowText), high: highText === '' ? undefined : Number(highText) };
+  data.desiredRanges[markerReferenceKey(selectedLabMarker)] = { low: lowText === '' ? undefined : Number(lowText), high: highText === '' ? undefined : Number(highText) };
   saveData(); renderLabs(); drawLabGraph(); toast('Desired range saved on this device.');
 }
 
 function addLab(event) {
   event.preventDefault();
-  const marker = document.getElementById('labMarker').value.trim();
+  const marker = canonicalLabMarker(document.getElementById('labMarker').value.trim());
   const key = markerReferenceKey(marker);
   const reference = hasMarkerReference(marker) ? markerReference(marker) : document.getElementById('labReference').value.trim();
   data.labReferences ||= {};
@@ -935,7 +945,7 @@ function addLab(event) {
   data.labs.push({ id: uniqueId('lab'), marker, date: document.getElementById('labDate').value, value: Number(document.getElementById('labValue').value), units: document.getElementById('labUnits').value.trim(), reference });
   data.desiredRanges ||= {};
   const low = document.getElementById('labDesiredLow').value, high = document.getElementById('labDesiredHigh').value;
-  if (low !== '' || high !== '') data.desiredRanges[marker.toLowerCase()] = { low: low === '' ? undefined : Number(low), high: high === '' ? undefined : Number(high) };
+  if (low !== '' || high !== '') data.desiredRanges[markerReferenceKey(marker)] = { low: low === '' ? undefined : Number(low), high: high === '' ? undefined : Number(high) };
   saveData(); renderLabs(); renderLocalCorrelations(); event.target.reset(); document.querySelector('.lab-entry-details').open = false; toast('Lab result saved on this device.');
 }
 
@@ -954,6 +964,7 @@ function parseLabText(text) {
 
 function renderLabPdfReview(rows, fileName) {
   const body = document.getElementById('labPdfRows');
+  rows.forEach((row) => { row.marker = canonicalLabMarker(row.marker); });
   const references = new Map();
   rows.forEach((row) => {
     const key = markerReferenceKey(row.marker);
@@ -976,6 +987,7 @@ function renderLabPdfReview(rows, fileName) {
 function applyCanonicalLabReferences(rows, useProvidedReference = false) {
   const references = new Map();
   rows.forEach((row) => {
+    row.marker = canonicalLabMarker(row.marker);
     const key = markerReferenceKey(row.marker);
     if (!references.has(key)) references.set(key, !useProvidedReference && hasMarkerReference(row.marker) ? markerReference(row.marker) : row.reference || '');
   });
@@ -1069,9 +1081,9 @@ function renderLocalCorrelations() {
   if (submitted.length < 6) { container.innerHTML = `<div class="empty-state">${submitted.length} of 6 required submitted days recorded. Keep logging; no drafts are counted.</div>`; return; }
   const correlations = [];
   const measurements = [...allSymptoms().map((name) => [name, (entry) => entry.symptoms?.[name.toLowerCase()]]), ['Energy', (entry) => entry.energyLevel === '' ? null : Number(entry.energyLevel)], ['Sleep quality', (entry) => entry.sleepQuality === '' ? null : Number(entry.sleepQuality)], ['Bowel movements', (entry) => { const count = (entry.stoolEvents || []).filter((event) => event.time || event.form).length; return count || null; }], ['Average stool form', (entry) => { const forms = (entry.stoolEvents || []).filter((event) => event.form !== '').map((event) => Number(event.form)).filter(Number.isFinite); return forms.length ? forms.reduce((sum, value) => sum + value, 0) / forms.length : null; }], ['Watch sleep (hours)', (entry) => entry.health?.sleepMinutes ? entry.health.sleepMinutes / 60 : null], ['Watch heart rate (bpm)', (entry) => entry.health?.averageHeartRate], ['Watch steps', (entry) => entry.health?.steps], ['Watch exercise (minutes)', (entry) => entry.health?.exerciseMinutes]];
-  [...new Set(data.labs.map((lab) => lab.marker))].forEach((marker) => measurements.push([`${marker} (lab within 30 days)`, (entry, date) => {
+  [...new Set(data.labs.map((lab) => canonicalLabMarker(lab.marker)))].forEach((marker) => measurements.push([`${marker} (lab within 30 days)`, (entry, date) => {
     const dayTime = new Date(`${date}T12:00:00`).getTime();
-    const nearest = data.labs.filter((lab) => lab.marker.toLowerCase() === marker.toLowerCase()).map((lab) => ({ ...lab, distance: Math.abs(new Date(`${lab.date}T12:00:00`).getTime() - dayTime) / 86400000 })).filter((lab) => lab.distance <= 30).sort((a, b) => a.distance - b.distance)[0];
+    const nearest = data.labs.filter((lab) => labMarkerIdentity(lab.marker) === labMarkerIdentity(marker)).map((lab) => ({ ...lab, distance: Math.abs(new Date(`${lab.date}T12:00:00`).getTime() - dayTime) / 86400000 })).filter((lab) => lab.distance <= 30).sort((a, b) => a.distance - b.distance)[0];
     return nearest ? Number(nearest.value) : null;
   }]));
   const itemNames = [...new Set(submitted.flatMap(({ entry }) => entry.routine.map((item) => item.name)))];

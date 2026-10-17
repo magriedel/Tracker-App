@@ -14,6 +14,29 @@ const KNOWN_MARKERS = [
   ['TRAb', /\btrab\b/i],
   ['TSI', /\btsi\b/i]
 ];
+const MARKER_ALIASES = [
+  ['TSH', ['tsh', 'ultrasensitive tsh', 'tsh ultrasensitive', 'sensitive tsh', 'tsh ultrasensible', 'thyroid stimulating hormone', 'thyroid stimulating hormone tsh', 'thyrotropin', 'tirotropina', 'hormona estimulante de la tiroides', 'hormona estimulante tiroidea', 'hormona estimulante tiroides', 'hormona estimulante tiroides ultrasensible']],
+  ['Free T4', ['free t4', 'ft4', 'free thyroxine', 'thyroxine free', 't4 free', 't4 libre', 't4 libre ft4', 't4 libre suero', 'thyroxine libre', 'tiroxina libre', 'tiroxina libre t4', 'tiroxina libre suero', 't4l']],
+  ['Free T3', ['free t3', 'ft3', 'free triiodothyronine', 'triiodothyronine free', 't3 free', 't3 libre', 'triyodotironina libre', 'triiodotironina libre', 't3l']],
+  ['Total T4', ['total t4', 't4 total', 'thyroxine total', 'thyroxine t4', 'thyroxine t4 total', 'tiroxina total', 't4 total serum']],
+  ['Total T3', ['total t3', 't3 total', 'triiodothyronine total', 'triiodotironina total']],
+  ['Thyroid Peroxidase Antibodies', ['tpo', 'tpo ab', 'tpo antibodies', 'thyroid peroxidase antibodies', 'thyroid peroxidase tpo ab', 'anti tpo', 'anti tpo antibodies', 'anticuerpos tpo', 'anticuerpos anti tpo', 'anticuerpos antiperoxidasa', 'anticuerpos antiperoxidasa tiroidea', 'anticuerpos contra la peroxidasa tiroidea']],
+  ['Thyroglobulin Antibodies', ['tg ab', 'tg antibodies', 'thyroglobulin antibodies', 'anti thyroglobulin', 'anticuerpos antitiroglobulina', 'anticuerpos anti tiroglobulina']],
+  ['TSI', ['tsi', 'thyroid stimulating immunoglobulin', 'thyroid stimulating immunoglobulins', 'inmunoglobulina estimulante tiroidea', 'inmunoglobulinas estimulantes tiroideas']],
+  ['TRAb', ['trab', 'tsh receptor antibodies', 'tsh receptor ab', 'thyrotropin receptor antibodies', 'anticuerpos del receptor de tsh', 'anticuerpos receptor tsh', 'anticuerpos anti receptor de tsh']]
+];
+const normalizeMarkerText = (marker) => String(marker ?? '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim().replace(/\s+/g, ' ');
+const MARKER_ALIAS_MAP = new Map(MARKER_ALIASES.flatMap(([canonical, aliases]) => aliases.map((alias) => [normalizeMarkerText(alias), canonical])));
+
+export function canonicalLabMarker(marker) {
+  const original = String(marker ?? '').trim();
+  return MARKER_ALIAS_MAP.get(normalizeMarkerText(original)) || original;
+}
+
+export function labMarkerIdentity(marker) {
+  return normalizeMarkerText(canonicalLabMarker(marker));
+}
+
 const LAB_UNITS = /^(?:%|units?|u?m?iu\/(?:l|ml)|µiu\/(?:l|ml)|μiu\/(?:l|ml)|mu\/l|ng\/(?:dl|ml|l)|u?g\/(?:dl|ml|l)|pg\/(?:ml|l)|pmol\/l|nmol\/l|mmol\/l|u?mol\/l|µmol\/l|μmol\/l|mg\/(?:dl|l)|g\/(?:dl|l)|u\/l|iu\/l|ml\/min(?:\/\d+(?:\.\d+)?)?|cells?\/(?:ul|µl|μl)|k\/ul|fl|pg|seconds?|sec|minutes?|min|ratio|index|copies\/ml|10\^?\d+\/(?:l|ul))$/i;
 const DOSE_UNITS = /^(?:mg|mcg|µg|μg|ug|g|grams?|iu|ml|capsules?|caps?|tablets?|pills?|scoops?|drops?|cfu|billion)(?:\s|$)/i;
 

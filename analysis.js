@@ -1,5 +1,7 @@
 // Analysis dashboard: filters, trends, heatmaps, on/off comparisons, change log and correlations. All local.
 
+import { canonicalLabMarker, labMarkerIdentity } from './lab-pdf.js';
+
 const PALETTE = ['#245e4d', '#9a641c', '#385e79', '#a23f55', '#6b5aa8', '#2f8f9d', '#7a7a2c', '#555f5b'];
 const state = { range: '30', metrics: null, item: '', group: '', outcome: 'Energy', lag: '0', minDays: '6' };
 
@@ -38,8 +40,8 @@ function buildMetrics(ctx) {
     { name: 'Watch steps', get: (entry) => num(entry.health?.steps) },
     { name: 'Watch exercise (min)', get: (entry) => num(entry.health?.exerciseMinutes) }
   ];
-  [...new Set(ctx.labs.map((lab) => lab.marker.trim()))].forEach((marker) => {
-    const values = ctx.labs.filter((lab) => lab.marker.trim().toLowerCase() === marker.toLowerCase());
+  [...new Set(ctx.labs.map((lab) => canonicalLabMarker(lab.marker)))].forEach((marker) => {
+    const values = ctx.labs.filter((lab) => labMarkerIdentity(lab.marker) === labMarkerIdentity(marker));
     metrics.push({ name: `${marker} (lab)`, lab: true, get: (entry, date) => {
       const time = toTime(date);
       const nearest = values.map((lab) => ({ lab, gap: Math.abs(toTime(lab.date) - time) / dayMs })).filter((row) => row.gap <= 30).sort((a, b) => a.gap - b.gap)[0];
