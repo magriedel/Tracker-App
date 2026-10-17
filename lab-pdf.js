@@ -65,7 +65,7 @@ function rangeFlag(value, reference) {
 }
 
 function parseLabcorpCbcLine(line, currentDate) {
-  const match = line.match(/^(.+?)\s+(?:\d{2}\s+)?([<>]?\s*-?\d+(?:[.,]\d+)?)(?:\s+([HL]))?(?:\s+([<>]?\s*-?\d+(?:[.,]\d+)?)\s+(\d{1,2}[-/]\d{1,2}[-/]\d{2,4}))?\s+([a-zµμ%][a-z0-9µμ/^.-]*)\s+([<>]?\s*-?\d+(?:[.,]\d+)?\s*(?:-|\u2013|\u2014|to)\s*[<>]?\s*-?\d+(?:[.,]\d+)?)(?:\s.*)?$/i);
+  const match = line.match(/^(.+?)\s+(?:\d{2}\s+)?([<>]?\s*-?\d+(?:[.,]\d+)?)(?:\s+(HIGH|LOW|H|L))?(?:\s+([<>]?\s*-?\d+(?:[.,]\d+)?)\s+(\d{1,2}[-/]\d{1,2}[-/]\d{2,4}))?\s+([a-zµμ%][a-z0-9µμ/^.-]*)\s+([<>]?\s*-?\d+(?:[.,]\d+)?\s*(?:-|\u2013|\u2014|to)\s*[<>]?\s*-?\d+(?:[.,]\d+)?)(?:\s.*)?$/i);
   if (!match) return null;
   const [, marker, currentRaw, explicitFlag, previousRaw, previousDate, units, reference] = match;
   if (!isLabUnit(units)) return null;
@@ -76,7 +76,8 @@ function parseLabcorpCbcLine(line, currentDate) {
   if (!Number.isFinite(currentValue)) return null;
   const cleanReference = reference.trim();
   const derivedFlag = rangeFlag(currentValue, cleanReference);
-  const rows = [{ marker: cleanMarker, date: currentDate, value: currentValue, units, reference: cleanReference, flag: explicitFlag || derivedFlag, flagSource: explicitFlag ? 'report' : derivedFlag ? 'reference interval' : '', resultPeriod: 'Current' }];
+  const reportFlag = /^H/i.test(explicitFlag || '') ? 'H' : /^L/i.test(explicitFlag || '') ? 'L' : '';
+  const rows = [{ marker: cleanMarker, date: currentDate, value: currentValue, units, reference: cleanReference, flag: reportFlag || derivedFlag, flagSource: reportFlag ? 'report' : derivedFlag ? 'reference interval' : '', resultPeriod: 'Current' }];
   if (previousRaw && previousDate) {
     const previousValue = toNumber(previousRaw);
     if (Number.isFinite(previousValue)) rows.push({ marker: cleanMarker, date: normalizeDate(previousDate), value: previousValue, units, reference: cleanReference, flag: '', flagSource: '', resultPeriod: 'Previous' });
