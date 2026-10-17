@@ -14,3 +14,5 @@
 .lab-pdf-table input[type=checkbox]{width:18px;height:18px;accent-color:var(--green)}
 .lab-pdf-actions{display:flex;justify-content:flex-end;flex-wrap:wrap;gap:8px;margin-top:12px}
 #labImportStatus{margin:8px 0;color:var(--muted);line-height:1.4}
+.lab-date-result+.lab-date-result{margin-top:6px;padding-top:6px;border-top:1px solid var(--line)}
+.lab-missing{color:var(--muted);text-align:center!important;font-style:italic}
