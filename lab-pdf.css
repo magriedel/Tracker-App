@@ -30,7 +30,8 @@
 .lab-results-matrix{width:max-content;min-width:100%;border-collapse:separate;border-spacing:0;font-size:.74rem}
 .lab-results-matrix th,.lab-results-matrix td{box-sizing:border-box;padding:6px 7px;border-bottom:1px solid var(--line);border-right:1px solid #e8ede9;text-align:center;vertical-align:top;background:#fff}
 .lab-results-matrix thead th{position:sticky;top:0;z-index:3;background:var(--mint);color:var(--green-dark);font-size:.68rem;white-space:nowrap}
-.lab-results-matrix th:first-child{width:138px;min-width:138px;max-width:160px;text-align:left}
+.lab-results-matrix th:first-child{position:sticky;left:0;z-index:4;width:138px;min-width:138px;max-width:160px;background:#f6f8f6;text-align:left}
+.lab-results-matrix thead th:first-child{top:0;z-index:5;background:var(--mint)}
 .lab-results-matrix th:not(:first-child):not(.lab-matrix-units):not(.lab-matrix-reference),.lab-results-matrix td:not(.lab-matrix-units):not(.lab-matrix-reference){width:126px;min-width:126px;max-width:150px}
 .lab-results-matrix .lab-matrix-units,.lab-results-matrix .lab-matrix-reference{position:sticky;z-index:2;background:#f6f8f6}
 .lab-results-matrix .lab-matrix-reference{right:0;width:116px;min-width:116px;max-width:132px;text-align:left;overflow-wrap:anywhere}
