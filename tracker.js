@@ -894,8 +894,10 @@ function renderLabs() {
   const groups = groupLabs().map((entries) => withinTimeframe(entries, document.getElementById('labTimeFilter').value)).filter((entries) => entries.length);
   if (!groups.length) { el.innerHTML = '<div class="empty-state">No results in this time period. Try a wider filter or add a result.</div>'; return; }
   const dates = [...new Set(groups.flatMap((entries) => entries.map((lab) => lab.date)))].sort((a, b) => b.localeCompare(a));
-  el.innerHTML = groups.map((entries) => {
-    const newestFirst = entries.slice().reverse(); const range = markerRange(entries[0].marker);
+  const bodyRows = groups.map((entries) => {
+    const newestFirst = entries.slice().reverse();
+    const marker = canonicalLabMarker(entries[0].marker);
+    const range = markerRange(marker);
     const cells = dates.map((date) => {
       const results = newestFirst.filter((lab) => lab.date === date);
       if (!results.length) return '<td class="lab-missing">N/A</td>';
@@ -903,12 +905,14 @@ function renderLabs() {
         const previous = entries.filter((entry) => entry.date < date).at(-1);
         const delta = previous ? Number(lab.value) - Number(previous.value) : null;
         const state = labRangeState(lab, range);
-        return `<div class="lab-date-result ${state}"><strong>${escapeHtml(lab.value)}${lab.flag ? ` ${escapeHtml(lab.flag)}` : ''}</strong><small>${escapeHtml(lab.units)}</small><span class="range-state ${state}">${state === 'in-range' ? 'In range' : state === 'out-range' ? 'Out of range' : 'Not set'}</span>${delta !== null ? `<small class="lab-delta">${delta > 0 ? '+' : ''}${escapeHtml(delta.toFixed(2))} vs prior</small>` : '<small class="lab-delta">Baseline</small>'}<button type="button" class="text-button" data-remove-lab="${escapeHtml(lab.id)}" aria-label="Remove result from ${escapeHtml(lab.date)}">Remove</button></div>`;
+        return `<div class="lab-date-result ${state}"><strong>${escapeHtml(lab.value)}${lab.flag ? ` ${escapeHtml(lab.flag)}` : ''}</strong>${lab.units ? `<small>${escapeHtml(lab.units)}</small>` : ''}<span class="range-state ${state}">${state === 'in-range' ? 'In range' : state === 'out-range' ? 'Out of range' : 'Not set'}</span>${delta !== null ? `<small class="lab-delta">${delta > 0 ? '+' : ''}${escapeHtml(delta.toFixed(2))} vs prior</small>` : ''}<button type="button" class="text-button" data-remove-lab="${escapeHtml(lab.id)}" aria-label="Remove ${escapeHtml(marker)} result from ${escapeHtml(lab.date)}">Remove</button></div>`;
       }).join('');
       return `<td class="lab-date-cell">${values}</td>`;
     }).join('');
-    return `<section class="marker-table-section"><button class="marker-open" type="button" data-open-marker="${escapeHtml(entries[0].marker)}"><span class="marker-chevron">↗</span><span><strong>${escapeHtml(entries[0].marker)}</strong><small>Tap for chart · ${range.low !== undefined || range.high !== undefined ? `desired ${escapeHtml(range.low ?? '—')}–${escapeHtml(range.high ?? '—')}` : 'set desired range'}</small></span></button><div class="lab-table-wrap"><table class="lab-table"><thead><tr><th>Result</th>${dates.map((date) => `<th>${escapeHtml(date)}</th>`).join('')}</tr></thead><tbody><tr><th>Value</th>${cells}</tr></tbody></table></div></section>`;
+    const desired = range.low !== undefined || range.high !== undefined ? `desired ${escapeHtml(range.low ?? '—')}–${escapeHtml(range.high ?? '—')}` : 'set desired range';
+    return `<tr><th scope="row"><button class="lab-marker-link" type="button" data-open-marker="${escapeHtml(marker)}"><strong>${escapeHtml(marker)}</strong><small>${desired} · chart</small></button></th>${cells}</tr>`;
   }).join('');
+  el.innerHTML = `<div class="lab-results-matrix-wrap"><table class="lab-results-matrix"><thead><tr><th scope="col">Biomarker</th>${dates.map((date) => `<th scope="col">${escapeHtml(date)}</th>`).join('')}</tr></thead><tbody>${bodyRows}</tbody></table></div>`;
   el.querySelectorAll('[data-open-marker]').forEach((button) => button.addEventListener('click', () => openLabDashboard(button.dataset.openMarker)));
   el.querySelectorAll('[data-remove-lab]').forEach((button) => button.addEventListener('click', () => { data.labs = data.labs.filter((lab) => lab.id !== button.dataset.removeLab); saveData(); renderLabs(); renderLocalCorrelations(); }));
 }

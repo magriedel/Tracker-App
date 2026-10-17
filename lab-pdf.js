@@ -1,4 +1,4 @@
-const DATE_PATTERN = /\b(20\d{2}[-/]\d{1,2}[-/]\d{1,2}|\d{1,2}[-/]\d{1,2}[-/]\d{2,4})\b/;
+const DATE_PATTERN = /\b(20\d{2}[-/.]\d{1,2}[-/.]\d{1,2}|\d{1,2}[-/.]\d{1,2}[-/.]\d{2,4})\b/;
 const NUMBER_PATTERN = /[<>]?\s*-?\d+(?:[.,]\d+)?/g;
 const KNOWN_MARKERS = [
   ['Free T4', /\b(?:free\s*t4|t4\s*,?\s*free|ft4)\b/i],
@@ -23,7 +23,47 @@ const MARKER_ALIASES = [
   ['Thyroid Peroxidase Antibodies', ['tpo', 'tpo ab', 'tpo antibodies', 'thyroid peroxidase antibodies', 'thyroid peroxidase tpo ab', 'anti tpo', 'anti tpo antibodies', 'anticuerpos tpo', 'anticuerpos anti tpo', 'anticuerpos antiperoxidasa', 'anticuerpos antiperoxidasa tiroidea', 'anticuerpos contra la peroxidasa tiroidea']],
   ['Thyroglobulin Antibodies', ['tg ab', 'tg antibodies', 'thyroglobulin antibodies', 'anti thyroglobulin', 'anticuerpos antitiroglobulina', 'anticuerpos anti tiroglobulina']],
   ['TSI', ['tsi', 'thyroid stimulating immunoglobulin', 'thyroid stimulating immunoglobulins', 'inmunoglobulina estimulante tiroidea', 'inmunoglobulinas estimulantes tiroideas']],
-  ['TRAb', ['trab', 'tsh receptor antibodies', 'tsh receptor ab', 'thyrotropin receptor antibodies', 'anticuerpos del receptor de tsh', 'anticuerpos receptor tsh', 'anticuerpos anti receptor de tsh']]
+  ['TRAb', ['trab', 'tsh receptor antibodies', 'tsh receptor ab', 'thyrotropin receptor antibodies', 'anticuerpos del receptor de tsh', 'anticuerpos receptor tsh', 'anticuerpos anti receptor de tsh']],
+  ['White Blood Cell Count', ['wbc', 'white blood cell count', 'white blood cells', 'leukocytes', 'leucocitos', 'globulos blancos', 'globulos blancos totales']],
+  ['Red Blood Cell Count', ['rbc', 'red blood cell count', 'red blood cells', 'erythrocytes', 'eritrocitos', 'globulos rojos']],
+  ['Hemoglobin', ['hemoglobin', 'haemoglobin', 'hemoglobina']],
+  ['Hematocrit', ['hematocrit', 'haematocrit', 'hematocrito']],
+  ['Platelets', ['platelet count', 'platelets', 'plaquetas', 'recuento de plaquetas']],
+  ['Neutrophils', ['neutrophils', 'neutrofilos', 'neutrofilos absolutos', 'neutrofilos porcentaje']],
+  ['Lymphocytes', ['lymphs', 'lymphocytes', 'linfocitos', 'linfocitos absolutos', 'linfocitos porcentaje']],
+  ['Monocytes', ['monocytes', 'monocitos', 'monocitos absolutos', 'monocitos porcentaje']],
+  ['Eosinophils', ['eos', 'eosinophils', 'eosinofilos', 'eosinofilos absolutos', 'eosinofilos porcentaje']],
+  ['Basophils', ['basos', 'basophils', 'basofilos', 'basofilos absolutos', 'basofilos porcentaje']],
+  ['Glucose', ['glucose', 'glucosa']],
+  ['Creatinine', ['creatinine', 'creatinina']],
+  ['Blood Urea Nitrogen', ['bun', 'blood urea nitrogen', 'urea nitrogen', 'nitrogeno ureico', 'nitrogeno ureico en sangre']],
+  ['Sodium', ['sodium', 'sodio']],
+  ['Potassium', ['potassium', 'potasio']],
+  ['Chloride', ['chloride', 'cloro', 'cloruro']],
+  ['Calcium', ['calcium', 'calcio']],
+  ['Albumin', ['albumin', 'albumina']],
+  ['Total Protein', ['total protein', 'proteina total']],
+  ['Total Bilirubin', ['total bilirubin', 'bilirubin total', 'bilirrubina total']],
+  ['Alkaline Phosphatase', ['alkaline phosphatase', 'alk phos', 'fosfatasa alcalina']],
+  ['Aspartate Aminotransferase', ['ast', 'sgot', 'aspartate aminotransferase', 'aspartato aminotransferasa', 'transaminasa got']],
+  ['Alanine Aminotransferase', ['alt', 'sgpt', 'alanine aminotransferase', 'alanina aminotransferasa', 'transaminasa gpt']],
+  ['Total Cholesterol', ['total cholesterol', 'cholesterol total', 'colesterol total']],
+  ['HDL Cholesterol', ['hdl', 'hdl cholesterol', 'colesterol hdl']],
+  ['LDL Cholesterol', ['ldl', 'ldl cholesterol', 'colesterol ldl']],
+  ['Triglycerides', ['triglycerides', 'trigliceridos']],
+  ['Vitamin D', ['vitamin d', '25 oh vitamin d', '25 hydroxy vitamin d', 'vitamina d', '25 oh vitamina d', '25 hidroxi vitamina d']],
+  ['Vitamin B12', ['vitamin b12', 'b12', 'vitamina b12', 'cobalamina']],
+  ['Ferritin', ['ferritin', 'ferritina']],
+  ['Iron', ['iron', 'hierro']],
+  ['Magnesium', ['magnesium', 'magnesio']],
+  ['Phosphorus', ['phosphorus', 'phosphate', 'fosforo', 'fosfato']],
+  ['C-Reactive Protein', ['crp', 'c reactive protein', 'proteina c reactiva', 'pcr']],
+  ['Cortisol', ['cortisol']],
+  ['Testosterone', ['testosterone', 'testosterona']],
+  ['Estradiol', ['estradiol', 'estradiolo', 'estradiol']],
+  ['Progesterone', ['progesterone', 'progesterona']],
+  ['Insulin', ['insulin', 'insulina']],
+  ['Prolactin', ['prolactin', 'prolactina']]
 ];
 const normalizeMarkerText = (marker) => String(marker ?? '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim().replace(/\s+/g, ' ');
 const MARKER_ALIAS_MAP = new Map(MARKER_ALIASES.flatMap(([canonical, aliases]) => aliases.map((alias) => [normalizeMarkerText(alias), canonical])));
@@ -71,7 +111,7 @@ const normalizeDate = (raw) => {
   const parts = raw.split(/[-/._]/).map(Number);
   let year; let month; let day;
   if (parts[0] > 31) [year, month, day] = parts;
-  else if (parts[0] > 12) { [day, month, year] = parts; if (year < 100) year += year < 50 ? 2000 : 1900; }
+  else if (String(raw).includes('.') || parts[0] > 12) { [day, month, year] = parts; if (year < 100) year += year < 50 ? 2000 : 1900; }
   else { [month, day, year] = parts; if (year < 100) year += year < 50 ? 2000 : 1900; }
   if (month < 1 || month > 12 || day < 1 || day > 31) return '';
   return `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
@@ -263,7 +303,7 @@ export function parseLabLines(rawLines, filenameDate = '') {
     else joined.push(normalized[index]);
   }
   const lines = joined.flatMap(splitAdjacentRows);
-  const labeledDateLines = lines.filter((line) => /\b(?:collection date|date collected|collected|drawn|draw date|specimen date|result date|reported|date of service|date)\b/i.test(line) && !/\b(?:date of birth|dob)\b/i.test(line));
+  const labeledDateLines = lines.filter((line) => /\b(?:collection date|date collected|collected|drawn|draw date|specimen date|result date|reported|date of service|fecha de (?:toma|recoleccion|extraccion|prueba|analisis)|fecha de servicio|date)\b/i.test(line) && !/\b(?:date of birth|dob|fecha de nacimiento)\b/i.test(line));
   let reportDate = filenameDate;
   for (const line of labeledDateLines) { const match = line.match(DATE_PATTERN); if (match) { reportDate = normalizeDate(match[1]); if (reportDate) break; } }
   const rows = [];
