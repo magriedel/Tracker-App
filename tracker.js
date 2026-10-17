@@ -930,7 +930,7 @@ function parseLabText(text) {
 
 function renderLabPdfReview(rows, fileName) {
   const body = document.getElementById('labPdfRows');
-  body.innerHTML = rows.map((row, index) => `<tr data-pdf-row="${index}"><td><input type="checkbox" data-field="include" checked aria-label="Import ${escapeHtml(row.marker)}" /></td><td><input type="text" data-field="marker" value="${escapeHtml(row.marker)}" aria-label="Marker" /></td><td><input type="date" data-field="date" value="${escapeHtml(row.date)}" aria-label="Result date" /></td><td><input type="number" step="any" data-field="value" value="${escapeHtml(row.value)}" aria-label="Result value" /></td><td><input type="text" data-field="units" value="${escapeHtml(row.units)}" aria-label="Units" /></td><td><input type="text" data-field="reference" value="${escapeHtml(row.reference)}" aria-label="Reference range" /></td></tr>`).join('');
+  body.innerHTML = rows.map((row, index) => `<tr data-pdf-row="${index}" data-flag="${escapeHtml(row.flag || '')}"><td><input type="checkbox" data-field="include" checked aria-label="Import ${escapeHtml(row.marker)} ${escapeHtml(row.resultPeriod || '')}" /></td><td>${escapeHtml(row.resultPeriod || 'Result')}</td><td><input type="text" data-field="marker" value="${escapeHtml(row.marker)}" aria-label="Marker" /></td><td><input type="date" data-field="date" value="${escapeHtml(row.date)}" aria-label="Result date" /></td><td><input type="number" step="any" data-field="value" value="${escapeHtml(row.value)}" aria-label="Result value" /></td><td>${escapeHtml(row.flag || '—')}</td><td><input type="text" data-field="units" value="${escapeHtml(row.units)}" aria-label="Units" /></td><td><input type="text" data-field="reference" value="${escapeHtml(row.reference)}" aria-label="Reference range" /></td></tr>`).join('');
   document.getElementById('labPdfSummary').textContent = `${rows.length} possible result${rows.length === 1 ? '' : 's'} found in ${fileName}. Check and correct each row before adding.`;
   document.getElementById('labPdfReview').showModal();
 }
@@ -943,7 +943,7 @@ function confirmLabPdfImport() {
     const field = (name) => row.querySelector(`[data-field="${name}"]`).value.trim();
     const marker = field('marker'); const date = field('date'); const value = Number(field('value'));
     if (!marker || !date || field('value') === '' || !Number.isFinite(value)) { toast('Each selected result needs a marker, date and numeric value.'); return; }
-    imported.push({ id: uniqueId('lab-pdf'), marker, date, value, units: field('units'), reference: field('reference') });
+    imported.push({ id: uniqueId('lab-pdf'), marker, date, value, units: field('units'), reference: field('reference'), flag: row.dataset.flag || '' });
   }
   data.labs.push(...imported);
   saveData(); renderLabs(); renderLocalCorrelations();

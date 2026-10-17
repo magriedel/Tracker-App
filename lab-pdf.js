@@ -51,6 +51,28 @@ function extractValueTail(tail) {
   return { value: result.value, units, reference };
 }
 
+function isLabUnit(units) {
+  const normalized = units.toLowerCase().replace(/\s+/g, '').replace(/[μ]/g, 'µ');
+  return LAB_UNITS.test(normalized) || /^x?10(?:e|\^)?\d+\/(?:u|µ)?l$/i.test(normalized);
+}
+
+function parseLabcorpCbcLine(line, currentDate) {
+  const match = line.match(/^(.+?)\s+(?:\d{2}\s+)?([<>]?\s*-?\d+(?:[.,]\d+)?)\s+(?:([HL])\s+)?([<>]?\s*-?\d+(?:[.,]\d+)?)\s+(\d{1,2}[-/]\d{1,2}[-/]\d{2,4})\s+([a-zµμ%][a-z0-9µμ/^.-]*)\s+([<>]?\s*-?\d+(?:[.,]\d+)?\s*(?:-|\u2013|\u2014|to)\s*[<>]?\s*-?\d+(?:[.,]\d+)?)(?:\s.*)?$/i);
+  if (!match) return null;
+  const [, marker, currentRaw, flag, previousRaw, previousDate, units, reference] = match;
+  if (!isLabUnit(units)) return null;
+  const toNumber = (value) => Number(value.replace(/\s/g, '').replace(',', '.'));
+  const cleanMarker = marker.replace(/\s+/g, ' ').trim();
+  if (!/[a-z]/i.test(cleanMarker)) return null;
+  const currentValue = toNumber(currentRaw);
+  const previousValue = toNumber(previousRaw);
+  if (!Number.isFinite(currentValue) || !Number.isFinite(previousValue)) return null;
+  return [
+    { marker: cleanMarker, date: currentDate, value: currentValue, units, reference: reference.trim(), flag: flag || '', resultPeriod: 'Current' },
+    { marker: cleanMarker, date: normalizeDate(previousDate), value: previousValue, units, reference: reference.trim(), flag: '', resultPeriod: 'Previous' }
+  ];
+}
+
 function candidateForLine(line, reportDate) {
   if (/\b(?:reference range|normal range|result\s+flag|patient|specimen|collected|collection date|date of birth|dob|accession|page\s+\d+)\b/i.test(line) && !/\b(?:tsh|t3|t4|vitamin|antibod|glucose|cholesterol)\b/i.test(line)) return null;
   const dateMatch = line.match(DATE_PATTERN);
@@ -61,7 +83,7 @@ function candidateForLine(line, reportDate) {
     const tail = line.slice(match.index + match[0].length).replace(DATE_PATTERN, ' ');
     const details = extractValueTail(tail);
     if (!details || DOSE_UNITS.test(details.units)) return null;
-    if (details.units && !LAB_UNITS.test(details.units.replace(/\s+/g, ''))) return null;
+    if (details.units && !isLabUnit(details.units)) return null;
     return { marker, date, ...details };
   }
   const numeric = firstNumber(line);
@@ -70,7 +92,7 @@ function candidateForLine(line, reportDate) {
   if (marker.length < 2 || marker.length > 60 || !/[a-z]/i.test(marker) || DATE_PATTERN.test(marker)) return null;
   if (/\b(?:page|phone|fax|zip|account|patient|specimen|accession|collected|reported|reference|range|result|date|dob)\b/i.test(marker)) return null;
   const details = extractValueTail(line.slice(numeric.index));
-  return details && LAB_UNITS.test(details.units.replace(/\s+/g, '')) ? { marker, date, ...details } : null;
+  return details && isLabUnit(details.units) ? { marker, date, ...details } : null;
 }
 
 export function parseLabLines(rawLines) {
@@ -81,12 +103,15 @@ export function parseLabLines(rawLines) {
   const rows = [];
   const seen = new Set();
   for (const line of lines) {
-    const row = candidateForLine(line, reportDate);
-    if (!row || !Number.isFinite(row.value)) continue;
-    const key = [row.marker.toLowerCase(), row.date, row.value, row.units.toLowerCase()].join('|');
-    if (seen.has(key)) continue;
-    seen.add(key);
-    rows.push(row);
+    const structured = parseLabcorpCbcLine(line, reportDate);
+    const candidates = structured || [candidateForLine(line, reportDate)].filter(Boolean);
+    for (const row of candidates) {
+      if (!Number.isFinite(row.value)) continue;
+      const key = [row.marker.toLowerCase(), row.date, row.value, row.units.toLowerCase()].join('|');
+      if (seen.has(key)) continue;
+      seen.add(key);
+      rows.push(row);
+    }
   }
   return rows;
 }
