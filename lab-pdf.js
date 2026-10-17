@@ -56,21 +56,32 @@ function isLabUnit(units) {
   return LAB_UNITS.test(normalized) || /^x?10(?:e|\^)?\d+\/(?:u|µ)?l$/i.test(normalized);
 }
 
+function rangeFlag(value, reference) {
+  const match = reference.match(/^\s*([<>]?)\s*(-?\d+(?:[.,]\d+)?)\s*(?:-|\u2013|\u2014|to)\s*([<>]?)\s*(-?\d+(?:[.,]\d+)?)\s*$/i);
+  if (!match) return '';
+  const low = Number(match[2].replace(',', '.'));
+  const high = Number(match[4].replace(',', '.'));
+  return value < low ? 'L' : value > high ? 'H' : '';
+}
+
 function parseLabcorpCbcLine(line, currentDate) {
-  const match = line.match(/^(.+?)\s+(?:\d{2}\s+)?([<>]?\s*-?\d+(?:[.,]\d+)?)\s+(?:([HL])\s+)?([<>]?\s*-?\d+(?:[.,]\d+)?)\s+(\d{1,2}[-/]\d{1,2}[-/]\d{2,4})\s+([a-zµμ%][a-z0-9µμ/^.-]*)\s+([<>]?\s*-?\d+(?:[.,]\d+)?\s*(?:-|\u2013|\u2014|to)\s*[<>]?\s*-?\d+(?:[.,]\d+)?)(?:\s.*)?$/i);
+  const match = line.match(/^(.+?)\s+(?:\d{2}\s+)?([<>]?\s*-?\d+(?:[.,]\d+)?)(?:\s+([HL]))?(?:\s+([<>]?\s*-?\d+(?:[.,]\d+)?)\s+(\d{1,2}[-/]\d{1,2}[-/]\d{2,4}))?\s+([a-zµμ%][a-z0-9µμ/^.-]*)\s+([<>]?\s*-?\d+(?:[.,]\d+)?\s*(?:-|\u2013|\u2014|to)\s*[<>]?\s*-?\d+(?:[.,]\d+)?)(?:\s.*)?$/i);
   if (!match) return null;
-  const [, marker, currentRaw, flag, previousRaw, previousDate, units, reference] = match;
+  const [, marker, currentRaw, explicitFlag, previousRaw, previousDate, units, reference] = match;
   if (!isLabUnit(units)) return null;
   const toNumber = (value) => Number(value.replace(/\s/g, '').replace(',', '.'));
   const cleanMarker = marker.replace(/\s+/g, ' ').trim();
   if (!/[a-z]/i.test(cleanMarker)) return null;
   const currentValue = toNumber(currentRaw);
-  const previousValue = toNumber(previousRaw);
-  if (!Number.isFinite(currentValue) || !Number.isFinite(previousValue)) return null;
-  return [
-    { marker: cleanMarker, date: currentDate, value: currentValue, units, reference: reference.trim(), flag: flag || '', resultPeriod: 'Current' },
-    { marker: cleanMarker, date: normalizeDate(previousDate), value: previousValue, units, reference: reference.trim(), flag: '', resultPeriod: 'Previous' }
-  ];
+  if (!Number.isFinite(currentValue)) return null;
+  const cleanReference = reference.trim();
+  const derivedFlag = rangeFlag(currentValue, cleanReference);
+  const rows = [{ marker: cleanMarker, date: currentDate, value: currentValue, units, reference: cleanReference, flag: explicitFlag || derivedFlag, flagSource: explicitFlag ? 'report' : derivedFlag ? 'reference interval' : '', resultPeriod: 'Current' }];
+  if (previousRaw && previousDate) {
+    const previousValue = toNumber(previousRaw);
+    if (Number.isFinite(previousValue)) rows.push({ marker: cleanMarker, date: normalizeDate(previousDate), value: previousValue, units, reference: cleanReference, flag: '', flagSource: '', resultPeriod: 'Previous' });
+  }
+  return rows;
 }
 
 function candidateForLine(line, reportDate) {
