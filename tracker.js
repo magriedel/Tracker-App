@@ -1431,13 +1431,18 @@ function parseLabText(text) {
   }
 
   const metadataHeaders = new Set([...markerHeaders, ...dateHeaders, ...unitHeaders, ...referenceHeaders, 'category', 'categoria', 'group', 'flag', 'status', 'reference interval']);
-  const dateColumns = rows[0].map((header, index) => ({ index, date: csvDate(header) })).filter((column) => column.date);
+  const dateColumns = rows[0].map((header, index) => {
+    const date = csvDate(header);
+    const normalizedDateHeader = normalizedHeaders[index];
+    const unitsIndex = normalizedDateHeader ? normalizedHeaders.findIndex((candidate, candidateIndex) => candidateIndex !== index && (candidate === `${normalizedDateHeader} unit` || candidate === `${normalizedDateHeader} units`)) : -1;
+    return { index, date, unitsIndex };
+  }).filter((column) => column.date);
   if (markerIndex >= 0 && dateColumns.length) {
     rows.slice(1).forEach((row, rowIndex) => {
       const biomarker = row[markerIndex];
       const units = unitIndex >= 0 ? row[unitIndex] : '';
       const reference = referenceIndex >= 0 ? row[referenceIndex] : '';
-      dateColumns.forEach(({ index, date }) => addResult(biomarker, date, row[index], units, reference, rowIndex));
+      dateColumns.forEach(({ index, date, unitsIndex }) => addResult(biomarker, date, row[index], unitsIndex >= 0 ? row[unitsIndex] : units, reference, rowIndex));
     });
     return parsed;
   }
