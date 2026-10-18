@@ -33,11 +33,20 @@
 .up{color:var(--green)}.down{color:#a23f55}
 .an-event{display:grid;grid-template-columns:auto 1fr;gap:2px 10px;padding:9px 0;border-bottom:1px solid var(--line);font-size:.84rem}
 .an-event time{color:var(--muted);font-size:.76rem}.an-event small{grid-column:1/3;color:var(--muted)}
-.an-corr{display:grid;grid-template-columns:1fr 70px 48px;gap:2px 10px;align-items:center;padding:9px 0;border-bottom:1px solid var(--line)}
+.an-coverage{display:grid;gap:6px;max-width:720px}
+.an-coverage-row{display:grid;grid-template-columns:minmax(150px,1fr) 52px minmax(80px,2fr);align-items:center;gap:9px;font-size:.75rem}
+.an-coverage-row span{overflow-wrap:anywhere}.an-coverage-row b{text-align:right;font-size:.7rem;color:var(--muted)}
+.an-coverage-row i{height:8px;overflow:hidden;border-radius:5px;background:var(--paper)}
+.an-coverage-row i em{display:block;height:100%;border-radius:inherit;background:var(--green)}
+.an-corr{display:grid;grid-template-columns:minmax(0,1fr) 70px 48px;gap:4px 10px;align-items:center;padding:9px 0;border-bottom:1px solid var(--line)}
 .an-corr-label{display:grid}.an-corr-label strong{font-size:.84rem}.an-corr-label span{font-size:.72rem;color:var(--muted)}
 .an-corr-bar{position:relative;height:10px;background:var(--paper);border-radius:5px}
 .an-corr-bar::after{content:"";position:absolute;left:50%;top:-2px;bottom:-2px;width:1px;background:var(--muted)}
 .an-corr-bar i{position:absolute;top:0;height:100%;border-radius:5px}
 .an-corr-bar i.pos{background:var(--green)}.an-corr-bar i.neg{background:#a23f55}
 .an-corr>b{text-align:right;font-size:.84rem}.an-corr small{grid-column:1/4;color:var(--muted);font-size:.72rem}
+.an-study-search{grid-column:1/-1;justify-self:start;min-height:32px;padding:6px 9px;font-size:.7rem}
+.an-study{display:grid;gap:4px;padding:10px 0;border-bottom:1px solid var(--line)}
+.an-study a{color:var(--green-dark);font-size:.82rem;font-weight:650;line-height:1.35}
+.an-study small{color:var(--muted);font-size:.7rem}
 @media(min-width:700px){.an-filters{grid-template-columns:repeat(3,minmax(0,1fr))}.an-summary{grid-template-columns:repeat(6,minmax(0,1fr))}}

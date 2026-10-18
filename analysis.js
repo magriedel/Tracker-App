@@ -1,4 +1,4 @@
-// Analysis dashboard: filters, trends, heatmaps, on/off comparisons, change log and correlations. All local.
+// Analysis dashboard: local trends, coverage, lagged associations, and optional public-study search.
 
 import { canonicalLabMarker, labMarkerIdentity } from './lab-pdf.js';
 
@@ -12,9 +12,9 @@ const toKey = (time) => { const d = new Date(time); return `${d.getFullYear()}-$
 const mean = (values) => values.reduce((sum, value) => sum + value, 0) / values.length;
 const fmt = (value, digits = 1) => (Number.isInteger(value) ? String(value) : value.toFixed(digits));
 
-function buildRecords(days) {
-  return Object.entries(days).flatMap(([date, day]) => {
-    if (day.submitted) return [{ date, entry: { ...day.submitted, routine: day.submitted.routine || [] } }];
+function buildRecords(days, healthByDate = {}, labs = []) {
+  const records = Object.entries(days).flatMap(([date, day]) => {
+    if (day.submitted) return [{ date, entry: { ...day.submitted, health: day.submitted.health || healthByDate[date] || null, routine: day.submitted.routine || [] } }];
     const checkins = day.parts?.checkin;
     const latestCheckin = Array.isArray(checkins) ? checkins[checkins.length - 1]?.entry : checkins?.entry;
     const entry = latestCheckin ? { ...latestCheckin, routine: [] } : { routine: [] };
@@ -23,8 +23,21 @@ function buildRecords(days) {
       const latest = Array.isArray(history) ? history[history.length - 1] : history;
       if (latest?.items) entry.routine.push(...latest.items);
     });
+    if (latestCheckin || entry.routine.length) entry.health ||= healthByDate[date] || null;
     return latestCheckin || entry.routine.length ? [{ date, entry }] : [];
-  }).sort((a, b) => a.date.localeCompare(b.date));
+  });
+  const dates = new Set(records.map((record) => record.date));
+  Object.entries(healthByDate).forEach(([date, health]) => {
+    if (!dates.has(date)) records.push({ date, entry: { health, routine: [], symptoms: {} } });
+    dates.add(date);
+  });
+  labs.forEach((lab) => {
+    if (lab.date && !dates.has(lab.date)) {
+      records.push({ date: lab.date, entry: { routine: [], symptoms: {} } });
+      dates.add(lab.date);
+    }
+  });
+  return records.sort((a, b) => a.date.localeCompare(b.date));
 }
 
 function buildMetrics(ctx) {
@@ -43,9 +56,8 @@ function buildMetrics(ctx) {
   [...new Set(ctx.labs.map((lab) => canonicalLabMarker(lab.marker)))].forEach((marker) => {
     const values = ctx.labs.filter((lab) => labMarkerIdentity(lab.marker) === labMarkerIdentity(marker));
     metrics.push({ name: `${marker} (lab)`, lab: true, get: (entry, date) => {
-      const time = toTime(date);
-      const nearest = values.map((lab) => ({ lab, gap: Math.abs(toTime(lab.date) - time) / dayMs })).filter((row) => row.gap <= 30).sort((a, b) => a.gap - b.gap)[0];
-      return nearest ? num(nearest.lab.value) : null;
+      const sameDate = values.filter((lab) => lab.date === date).map((lab) => num(lab.value)).filter((value) => value !== null);
+      return sameDate.length ? mean(sameDate) : null;
     } });
   });
   return metrics;
@@ -146,27 +158,87 @@ function changeLog(model, filtered) {
 
 function correlations(model, filtered) {
   const lag = Number(state.lag); const minDays = Number(state.minDays);
-  const names = [...new Set(filtered.flatMap((record) => record.entry.routine.map((item) => item.name)))].filter((name) => !state.item || name === state.item).filter((name) => !state.group || filtered.some((record) => record.entry.routine.some((item) => item.name === name && item.group === state.group)));
   const rows = [];
-  names.forEach((name) => model.metrics.forEach((metric) => {
+  const outcomes = model.metrics.filter((metric) => !metric.lab || metric.name.endsWith('(lab)'));
+  const routineNames = [...new Set(filtered.flatMap((record) => record.entry.routine.filter((item) => !state.group || item.group === state.group).map((item) => item.name)))].filter((name) => !state.item || name === state.item);
+  routineNames.forEach((name) => outcomes.forEach((metric) => {
     const pairs = [];
-    filtered.forEach((record) => { const on = itemOn(record.entry, name); const value = outcomeOn(model, record, metric, lag); if (on !== null && value !== null && value !== undefined) pairs.push([on ? 1 : 0, value]); });
+    filtered.forEach((record) => {
+      const item = record.entry.routine.find((candidate) => candidate.name === name && (!state.group || candidate.group === state.group));
+      const value = outcomeOn(model, record, metric, lag);
+      if (item && value !== null && value !== undefined) pairs.push([Boolean(item.enabled) ? 1 : 0, value]);
+    });
     const onCount = pairs.filter((p) => p[0] === 1).length; const offCount = pairs.length - onCount;
     if (pairs.length < minDays || onCount < 2 || offCount < 2) return;
     const r = pearson(pairs);
     if (r === null) return;
-    rows.push({ name, metric: metric.name, r, n: pairs.length, on: mean(pairs.filter((p) => p[0] === 1).map((p) => p[1])), off: mean(pairs.filter((p) => p[0] === 0).map((p) => p[1])) });
+    rows.push({ exposure: name, metric: metric.name, kind: 'routine', r, n: pairs.length, coverage: pairs.length / filtered.length, on: mean(pairs.filter((p) => p[0] === 1).map((p) => p[1])), off: mean(pairs.filter((p) => p[0] === 0).map((p) => p[1])) });
+  }));
+  const continuous = model.metrics.filter((metric) => !state.item || metric.name === state.item);
+  continuous.forEach((exposure) => outcomes.forEach((metric) => {
+    if (exposure.name === metric.name) return;
+    const pairs = [];
+    filtered.forEach((record) => {
+      const x = exposure.get(record.entry, record.date);
+      const y = outcomeOn(model, record, metric, lag);
+      if (x !== null && x !== undefined && y !== null && y !== undefined && Number.isFinite(Number(x)) && Number.isFinite(Number(y))) pairs.push([Number(x), Number(y)]);
+    });
+    if (pairs.length < minDays || new Set(pairs.map(([x]) => x)).size < 2 || new Set(pairs.map(([, y]) => y)).size < 2) return;
+    const r = pearson(pairs);
+    if (r === null) return;
+    rows.push({ exposure: exposure.name, metric: metric.name, kind: 'measure', r, n: pairs.length, coverage: pairs.length / filtered.length });
   }));
   rows.sort((a, b) => Math.abs(b.r) - Math.abs(a.r));
-  if (!rows.length) return `<div class="empty-state">Not enough on and off days yet (need at least ${minDays} days with 2+ on and 2+ off). Try a longer period or a lower minimum.</div>`;
-  return rows.slice(0, 15).map((row) => `<div class="an-corr"><div class="an-corr-label"><strong>${esc(row.name)}</strong><span>with ${esc(row.metric)}</span></div><div class="an-corr-bar" aria-hidden="true"><i class="${row.r >= 0 ? 'pos' : 'neg'}" style="width:${Math.abs(row.r) * 50}%;${row.r >= 0 ? 'left:50%' : `right:50%`}"></i></div><b>${row.r > 0 ? '+' : ''}${row.r.toFixed(2)}</b><small>${row.n} days · on ${fmt(row.on)} vs off ${fmt(row.off)}</small></div>`).join('') + '<p class="fine-print">Association only: other factors, timing and chance can explain these. Discuss patterns with your clinician; they are not proof of cause.</p>';
+  if (!rows.length) return `<div class="empty-state">No candidate patterns meet the current minimum of ${minDays} paired days. Missing values are excluded, not treated as zero.</div>`;
+  return rows.slice(0, 20).map((row) => `<div class="an-corr"><div class="an-corr-label"><strong>${esc(row.exposure)}</strong><span>${row.kind === 'routine' ? 'routine on/off' : 'measure'} with ${esc(row.metric)}</span></div><div class="an-corr-bar" aria-hidden="true"><i class="${row.r >= 0 ? 'pos' : 'neg'}" style="width:${Math.abs(row.r) * 50}%;${row.r >= 0 ? 'left:50%' : 'right:50%'}"></i></div><b>${row.r > 0 ? '+' : ''}${row.r.toFixed(2)}</b><small>${row.n} paired days · ${Math.round(row.coverage * 100)}% coverage${row.on !== undefined ? ` · on avg ${fmt(row.on)} vs off avg ${fmt(row.off)}` : ''}</small><button type="button" class="button secondary an-study-search" data-study-exposure="${esc(row.exposure)}" data-study-outcome="${esc(row.metric)}">Find studies</button></div>`).join('') + '<p class="fine-print">Exploratory association only; this does not show that one measure caused another. Many comparisons increase chance findings. Discuss patterns with your clinician.</p>';
+}
+
+function coverage(model, filtered) {
+  const observed = model.metrics.map((metric) => {
+    const count = filtered.filter((record) => {
+      const value = metric.get(record.entry, record.date);
+      return value !== null && value !== undefined && Number.isFinite(Number(value));
+    }).length;
+    return { metric, count };
+  }).filter(({ count }) => count > 0).sort((a, b) => a.metric.name.localeCompare(b.metric.name));
+  if (!observed.length) return '<div class="empty-state">No measurements recorded in this period.</div>';
+  return `<div class="an-coverage">${observed.map(({ metric, count }) => `<div class="an-coverage-row"><span>${esc(metric.name)}</span><b>${count}/${filtered.length}</b><i><em style="width:${filtered.length ? count / filtered.length * 100 : 0}%"></em></i></div>`).join('')}</div><p class="fine-print">Coverage is the number of dates with a recorded value divided by dates in the selected analysis timeline.</p>`;
+}
+
+async function searchStudies(root, button) {
+  const exposure = button.dataset.studyExposure;
+  const outcome = button.dataset.studyOutcome;
+  const query = `${exposure} AND ${outcome} AND (thyroid OR Graves disease)`;
+  if (!confirm(`Search PubMed for public studies using only these search terms?\n\n${query}\n\nNo tracker measurements or records will be sent.`)) return;
+  const results = root.querySelector('[data-study-results]');
+  results.innerHTML = '<p class="fine-print">Searching PubMed…</p>';
+  results.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  try {
+    const base = 'https://eutils.ncbi.nlm.nih.gov/entrez/eutils/';
+    const search = await fetch(`${base}esearch.fcgi?db=pubmed&retmode=json&retmax=5&term=${encodeURIComponent(query)}`).then((response) => {
+      if (!response.ok) throw new Error('Search unavailable');
+      return response.json();
+    });
+    const ids = search.esearchresult.idlist;
+    if (!ids.length) { results.innerHTML = '<p class="fine-print">No matching public studies found for those terms.</p>'; return; }
+    const summaries = await fetch(`${base}esummary.fcgi?db=pubmed&retmode=json&id=${ids.join(',')}`).then((response) => {
+      if (!response.ok) throw new Error('Study details unavailable');
+      return response.json();
+    });
+    results.innerHTML = ids.map((id) => {
+      const article = summaries.result[id];
+      return `<article class="an-study"><a href="https://pubmed.ncbi.nlm.nih.gov/${encodeURIComponent(id)}/" target="_blank" rel="noreferrer">${esc(article.title || 'Untitled study')}</a><small>${esc(article.pubdate || 'Date unknown')} · ${esc(article.fulljournalname || article.source || 'PubMed')} · PMID ${esc(id)}</small></article>`;
+    }).join('') + '<p class="fine-print">These papers are search results, not evidence that the observed personal association is causal or clinically actionable.</p>';
+  } catch {
+    results.innerHTML = '<p class="fine-print">Could not reach PubMed. Check the connection and try again.</p>';
+  }
 }
 
 function summary(model, filtered) {
   const avg = (name) => { const metric = model.metrics.find((m) => m.name === name); const values = filtered.map((r) => metric.get(r.entry, r.date)).filter((v) => v !== null && v !== undefined); return values.length ? fmt(mean(values)) : '–'; };
   const adherence = filtered.map((record) => { const items = record.entry.routine; return items.length ? items.filter((item) => item.enabled).length / items.length : null; }).filter((v) => v !== null);
   const symptomAverages = model.metrics.filter((m) => m.symptom).map((metric) => ({ name: metric.name, value: mean(filtered.map((r) => metric.get(r.entry) || 0)) })).sort((a, b) => b.value - a.value)[0];
-  const cards = [['Days logged', String(filtered.length)], ['Avg energy', avg('Energy')], ['Avg sleep quality', avg('Sleep quality')], ['Avg routine on', adherence.length ? `${Math.round(mean(adherence) * 100)}%` : '–'], ['Avg bowel movements', avg('Bowel movements')], ['Top symptom', symptomAverages && symptomAverages.value > 0 ? symptomAverages.name : '–']];
+  const cards = [['Dates in analysis', String(filtered.length)], ['Avg energy', avg('Energy')], ['Avg sleep quality', avg('Sleep quality')], ['Avg routine on', adherence.length ? `${Math.round(mean(adherence) * 100)}%` : '–'], ['Avg bowel movements', avg('Bowel movements')], ['Top symptom', symptomAverages && symptomAverages.value > 0 ? symptomAverages.name : '–']];
   return cards.map(([label, value]) => `<div class="an-card"><strong>${esc(value)}</strong><span>${esc(label)}</span></div>`).join('');
 }
 
@@ -187,7 +259,7 @@ function controls(model) {
 }
 
 export function renderAnalysis(root, ctx) {
-  const records = buildRecords(ctx.days);
+  const records = buildRecords(ctx.days, ctx.healthByDate, ctx.labs);
   const metrics = buildMetrics(ctx);
   const model = { records, metrics, byDate: new Map(records.map((record) => [record.date, record])) };
   if (!state.metrics) state.metrics = ['Energy', 'Sleep quality'];
@@ -198,14 +270,18 @@ export function renderAnalysis(root, ctx) {
   const filtered = records.filter((record) => record.date >= cutoff);
   const section = (title, hint, body) => `<section class="an-section"><div class="section-rule"><h3>${title}</h3><span>${hint}</span></div>${body}</section>`;
   root.innerHTML = `${controls(model)}
+    <p class="fine-print an-local-note">Analysis is calculated on this device. Candidate patterns are exploratory, not proof of cause. Study search sends only confirmed search terms, not tracker values.</p>
     <div class="an-summary">${summary(model, filtered)}</div>
+    ${section('Data coverage', `${filtered.length} dates`, coverage(model, filtered))}
     ${section('Trends', 'Selected measures', lineChart(model, filtered))}
     ${section('Routine adherence', 'Green = on', adherenceHeatmap(model, filtered))}
     ${section('Symptom intensity', 'Darker = stronger', symptomHeatmap(model, filtered))}
     ${section('On vs off', state.item ? esc(state.item) : 'Pick a focus item', comparison(model, filtered))}
     ${section('Change log', 'Starts, stops, dose changes', changeLog(model, filtered))}
-    ${section('Potential correlations', state.lag === '0' ? 'Same day' : `Effect ${state.lag} day(s) later`, correlations(model, filtered))}`;
+    ${section('Potential patterns', state.lag === '0' ? 'Same day' : `Outcome ${state.lag} day(s) later`, correlations(model, filtered))}
+    ${section('Public studies', 'Search terms only; no tracker measurements sent', '<div data-study-results><p class="fine-print">Choose “Find studies” beside a candidate pattern to search PubMed after confirmation.</p></div>')}`;
   root.querySelectorAll('[data-filter]').forEach((select) => select.addEventListener('change', () => { state[select.dataset.filter] = select.value; if (select.dataset.filter === 'group') state.item = ''; renderAnalysis(root, ctx); }));
+  root.querySelectorAll('[data-study-exposure]').forEach((button) => button.addEventListener('click', () => searchStudies(root, button)));
   root.querySelectorAll('[data-metric]').forEach((box) => box.addEventListener('change', () => {
     state.metrics = [...root.querySelectorAll('[data-metric]:checked')].map((input) => input.dataset.metric);
     const open = root.querySelector('.an-metrics')?.open;

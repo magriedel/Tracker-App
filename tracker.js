@@ -1,6 +1,6 @@
 import { Chess } from './chess-engine.js';
 import { interpretQuickUpdate } from './quick-update.js';
-import { renderAnalysis } from './analysis.js';
+import { renderAnalysis } from './analysis.js?v=2';
 import { WISDOM } from './wisdom.js';
 import { canonicalLabMarker, labMarkerIdentity, readPdfLabRows } from './lab-pdf.js';
 import { DEFAULT_LAB_CATEGORIES, catalogCategoryForMarker, catalogMarkerDefinition, defaultLabCategories, demographicReference, labUnitConversion, standardizeLabResult } from './lab-catalog.js';
@@ -1882,7 +1882,7 @@ function showScreen(name) {
   document.querySelectorAll('[data-screen]').forEach((tab) => { const active = tab === target; tab.classList.toggle('active', active); tab.setAttribute('aria-selected', String(active)); });
   document.querySelectorAll('.screen').forEach((screen) => { const active = screen.id === `screen-${name}`; screen.hidden = !active; screen.classList.toggle('active', active); });
   if (name === 'labs') renderLabs();
-  if (name === 'analysis') renderAnalysis(document.getElementById('analysisRoot'), { days: data.days, labs: data.labs || [], symptoms: allSymptoms() });
+  if (name === 'analysis') renderAnalysis(document.getElementById('analysisRoot'), { days: data.days, labs: data.labs || [], healthByDate: data.healthByDate || {}, symptoms: allSymptoms() });
   if (name === 'research') { researchHasLoaded = true; chooseResearchTopic(); searchPapers({ preventDefault() {} }); }
 }
 function setupTabs() {
