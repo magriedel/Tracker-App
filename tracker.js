@@ -1081,6 +1081,21 @@ function addLabCatalogMarkerPrompt() {
   saveData(); renderLabs();
 }
 
+function migrateExistingLabCatalog() {
+  let changed = false;
+  data.labs.forEach((lab) => {
+    const marker = canonicalUserLabMarker(lab.marker);
+    if (marker !== lab.marker) { lab.marker = marker; changed = true; }
+    const key = markerReferenceKey(marker);
+    if (data.hiddenLabMarkers[key]) return;
+    if (!labCategories().some((category) => category.markers.some((name) => markerReferenceKey(name) === key))) {
+      ensureCatalogMarker(marker);
+      changed = true;
+    }
+  });
+  if (changed) saveData();
+}
+
 function openLabCategoryMenu(name) {
   labCategoryToManage = name;
   activeLabCategory = name;
@@ -1936,6 +1951,7 @@ document.getElementById('puzzleRatingInput').addEventListener('change', (event) 
 document.getElementById('labDate').value = activeDate;
 document.getElementById('labProfileAge').value = data.labProfile.age ?? '';
 document.getElementById('labProfileSex').value = data.labProfile.sex ?? '';
+migrateExistingLabCatalog();
 setupTabs(); setupVoice(); setDate(activeDate); renderLabs(); renderMomentum(); renderPuzzle(); renderLocalCorrelations(); saveData();
 
 if ('serviceWorker' in navigator) window.addEventListener('load', () => navigator.serviceWorker.register('./sw.js').catch(() => {}));
