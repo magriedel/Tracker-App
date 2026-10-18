@@ -1341,10 +1341,11 @@ function renderLabs() {
   const allGroups = groupLabs();
   const allEntries = allGroups.flatMap((entries) => entries);
   const groups = allGroups.map((entries) => withinTimeframe(entries, document.getElementById('labTimeFilter').value)).filter((entries) => entries.length);
-  const dates = [...new Set(groups.flatMap((entries) => entries.map((lab) => lab.date)))].sort((a, b) => b.localeCompare(a));
   const portrait = window.matchMedia('(max-width:560px) and (orientation:portrait)').matches;
   const activeCategory = labCategories().find((category) => category.name === activeLabCategory);
   const selectedMarkers = activeCategory?.markers || [];
+  const selectedMarkerKeys = new Set(selectedMarkers.map((marker) => markerReferenceKey(marker)));
+  const dates = [...new Set(groups.filter((entries) => selectedMarkerKeys.has(markerReferenceKey(entries[0].marker))).flatMap((entries) => entries.map((lab) => lab.date)))].sort((a, b) => b.localeCompare(a));
   const bodyRows = selectedMarkers.map((catalogMarker) => {
     const key = markerReferenceKey(catalogMarker);
     const entries = groups.find((group) => markerReferenceKey(group[0].marker) === key) || [];
