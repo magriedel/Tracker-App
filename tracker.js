@@ -79,6 +79,7 @@ const data = loadData();
 data.labCategories ||= defaultLabCategories();
 data.labMarkerAliases ||= {};
 data.labProfile ||= { age: '', sex: '' };
+data.labUnits ||= {};
 data.hiddenLabMarkers ||= {};
 const storedLabReferences = data.labReferences || {};
 data.labReferences = {};
@@ -121,7 +122,7 @@ let pendingLabRows = [];
 
 function saveData() {
   const submittedDays = Object.fromEntries(Object.entries(data.days).filter(([, day]) => day.submitted || Object.keys(day.parts || {}).length).map(([date, day]) => [date, { submitted: day.submitted, submissionHistory: day.submissionHistory || [], parts: day.parts || {} }]));
-  localStorage.setItem(STORAGE_KEY, JSON.stringify({ days: submittedDays, labs: data.labs || [], labReferences: data.labReferences || {}, customItems: data.customItems || [], customSymptoms: data.customSymptoms || [], doseOverrides: data.doseOverrides || {}, routineOverrides: data.routineOverrides || {}, deletedRoutineItems: data.deletedRoutineItems || [], routineGroups: routineGroups(), desiredRanges: data.desiredRanges || {}, healthByDate: data.healthByDate || {}, labCategories: data.labCategories || defaultLabCategories(), labMarkerAliases: data.labMarkerAliases || {}, hiddenLabMarkers: data.hiddenLabMarkers || {}, labProfile: data.labProfile || {}, puzzle: { ...data.puzzle, rating: undefined } }));
+  localStorage.setItem(STORAGE_KEY, JSON.stringify({ days: submittedDays, labs: data.labs || [], labReferences: data.labReferences || {}, customItems: data.customItems || [], customSymptoms: data.customSymptoms || [], doseOverrides: data.doseOverrides || {}, routineOverrides: data.routineOverrides || {}, deletedRoutineItems: data.deletedRoutineItems || [], routineGroups: routineGroups(), desiredRanges: data.desiredRanges || {}, healthByDate: data.healthByDate || {}, labCategories: data.labCategories || defaultLabCategories(), labMarkerAliases: data.labMarkerAliases || {}, hiddenLabMarkers: data.hiddenLabMarkers || {}, labUnits: data.labUnits || {}, labProfile: data.labProfile || {}, puzzle: { ...data.puzzle, rating: undefined } }));
 }
 
 function previousDay(date) { const day = new Date(`${date}T12:00:00`); day.setDate(day.getDate() - 1); return `${day.getFullYear()}-${String(day.getMonth() + 1).padStart(2, '0')}-${String(day.getDate()).padStart(2, '0')}`; }
@@ -903,12 +904,51 @@ function baseCatalogMarker(marker) {
   return DEFAULT_LAB_CATEGORIES.flatMap((category) => category.markers).find((item) => labMarkerIdentity(item.name) === key)?.name || marker;
 }
 
+function numericReference(reference) {
+  const text = String(reference || '').replace(/,/g, '.').trim();
+  const titer = text.match(/([<>≤≥]?\s*\d+(?:\.\d+)?\s*:\s*\d+)/);
+  if (titer) return titer[1].replace(/\s+/g, '');
+  const range = text.match(/([<>≤≥]?\s*-?\d+(?:\.\d+)?)\s*(?:–|—|-|\bto\b)\s*([<>≤≥]?\s*-?\d+(?:\.\d+)?)/i);
+  if (range) return `${range[1].replace(/\s+/g, '')}–${range[2].replace(/\s+/g, '')}`;
+  const threshold = text.match(/(?:^|\s)([<>≤≥]\s*-?\d+(?:\.\d+)?)(?:\s|$)/);
+  if (threshold) return threshold[1].replace(/\s+/g, '');
+  const single = text.match(/^\s*(-?\d+(?:\.\d+)?)\s*$/);
+  return single ? single[1] : '';
+}
+
 function standardizeAppLabResult(row) {
   const displayName = row.marker;
+  const key = markerReferenceKey(displayName);
   const converted = standardizeLabResult({ ...row, marker: baseCatalogMarker(displayName) });
+  const preferredUnits = data.labUnits?.[key];
+  if (preferredUnits && preferredUnits !== converted.units) convertAppResultUnits(converted, preferredUnits);
   converted.marker = displayName;
   Object.assign(row, converted);
   return row;
+}
+
+function convertAppResultUnits(row, targetUnits) {
+  const baseMarker = baseCatalogMarker(row.marker);
+  const sourceUnits = row.units;
+  const sourceConversion = labUnitConversion(baseMarker, sourceUnits);
+  const targetConversion = labUnitConversion(baseMarker, targetUnits);
+  if (!sourceConversion || !targetConversion || targetUnits === sourceUnits) return row;
+  const standardValue = Number(row.value) * sourceConversion.factor + sourceConversion.offset;
+  row.value = Number(((standardValue - targetConversion.offset) / targetConversion.factor).toPrecision(7));
+  const inverseFactor = 1 / targetConversion.factor;
+  const inverseOffset = -targetConversion.offset / targetConversion.factor;
+  row.reference = convertReferenceForDisplay(row.reference, inverseFactor, inverseOffset, sourceConversion.units, targetUnits);
+  row.units = targetUnits;
+  return row;
+}
+
+function convertReferenceForDisplay(reference, factor, offset, sourceUnits, targetUnits) {
+  const range = String(reference || '').match(/^\s*(-?\d+(?:\.\d+)?)\s*[–-]\s*(-?\d+(?:\.\d+)?)(.*)$/);
+  if (!range) return reference;
+  const low = Number(range[1]) * factor + offset;
+  const high = Number(range[2]) * factor + offset;
+  const suffix = range[3].trim().toLowerCase().replace(/[μµ]/g, 'u').replace(/\s+/g, '') === String(sourceUnits).toLowerCase().replace(/[μµ]/g, 'u').replace(/\s+/g, '') ? ` ${targetUnits}` : range[3];
+  return `${Math.min(low, high).toFixed(2)}–${Math.max(low, high).toFixed(2)}${suffix}`;
 }
 
 function migrateStoredLabUnits() {
@@ -1060,6 +1100,25 @@ function handleLabMatrixEdit(event) {
   }
   if (action.moveLabMarker) {
     labMarkerMenu.moving = !labMarkerMenu.moving;
+    renderLabs();
+    return;
+  }
+  if (action.editLabUnits || action.editLabReference) {
+    const key = action.editLabUnits || action.editLabReference;
+    const marker = labCategories().flatMap((category) => category.markers).find((name) => markerReferenceKey(name) === key);
+    if (!marker) return;
+    if (action.editLabUnits) {
+      const current = data.labUnits?.[key] || catalogMarkerDefinition(baseCatalogMarker(marker))?.units || '';
+      const units = prompt(`Units for ${marker}:`, current)?.trim();
+      if (units === undefined) return;
+      saveMarkerUnits(marker, units);
+    } else {
+      const current = numericReference(markerReference(marker) || catalogMarkerDefinition(baseCatalogMarker(marker))?.reference);
+      const reference = prompt(`Numeric reference interval for ${marker}:`, current)?.trim();
+      if (reference === undefined) return;
+      saveMarkerReference(marker, reference);
+    }
+    labMarkerMenu = { key: '', moving: false };
     renderLabs();
     return;
   }
@@ -1237,6 +1296,34 @@ function saveMarkerReference(marker, value) {
   data.labs.forEach((lab) => { if (markerReferenceKey(lab.marker) === key) lab.reference = value.trim(); });
   saveData();
 }
+function saveMarkerUnits(marker, value) {
+  const key = markerReferenceKey(marker);
+  const baseName = baseCatalogMarker(marker);
+  const defaultUnits = catalogMarkerDefinition(baseName)?.units || '';
+  const customUnits = value.trim();
+  const targetUnits = customUnits || defaultUnits;
+  const sample = data.labs.find((lab) => markerReferenceKey(lab.marker) === key);
+  const sourceUnits = sample?.units || data.labUnits?.[key] || defaultUnits;
+  if (sourceUnits && targetUnits && sourceUnits !== targetUnits) {
+    if (data.labReferences?.[key]) {
+      const reference = { marker, units: sourceUnits, value: 0, reference: data.labReferences[key] };
+      convertAppResultUnits(reference, targetUnits);
+      data.labReferences[key] = reference.reference;
+    }
+    const range = data.desiredRanges?.[key];
+    if (range) ['low', 'high'].forEach((bound) => {
+      if (range[bound] === undefined || range[bound] === '') return;
+      const measurement = { marker, units: sourceUnits, value: range[bound], reference: '' };
+      convertAppResultUnits(measurement, targetUnits);
+      range[bound] = measurement.value;
+    });
+  }
+  data.labUnits ||= {};
+  if (customUnits) data.labUnits[key] = customUnits;
+  else delete data.labUnits[key];
+  data.labs.forEach((lab) => { if (markerReferenceKey(lab.marker) === key) standardizeAppLabResult(lab); });
+  saveData();
+}
 function markerRange(marker) {
   const saved = data.desiredRanges?.[markerReferenceKey(marker)];
   return saved && ((saved.low !== undefined && saved.low !== '') || (saved.high !== undefined && saved.high !== '')) ? saved : referenceBounds(markerReference(marker)) || {};
@@ -1266,9 +1353,9 @@ function renderLabs() {
     const marker = canonicalUserLabMarker(historicalEntries[0]?.marker || catalogMarker);
     const range = markerRange(marker);
     const units = [...new Set(historicalEntries.map((lab) => lab.units).filter(Boolean))];
-    const standardUnits = catalogMarkerDefinition(baseCatalogMarker(marker))?.units || '';
+    const standardUnits = data.labUnits?.[key] || catalogMarkerDefinition(baseCatalogMarker(marker))?.units || '';
     const unitLabel = standardUnits || (units.length > 1 ? 'Varies' : units[0] || '—');
-    const reference = markerReference(marker) || catalogMarkerDefinition(baseCatalogMarker(marker))?.reference || '—';
+    const reference = numericReference(markerReference(marker) || catalogMarkerDefinition(baseCatalogMarker(marker))?.reference);
     const cells = dates.map((date) => {
       const results = newestFirst.filter((lab) => lab.date === date);
       const dateClass = 'lab-date-column';
@@ -1280,7 +1367,7 @@ function renderLabs() {
       }).join('');
       return `<td class="lab-date-cell ${dateClass}">${values}</td>`;
     }).join('');
-    const markerEditMenu = labMarkerMenu.key === key ? `<div class="lab-marker-edit-menu"><button type="button" data-rename-lab-marker="${escapeHtml(key)}">Rename</button><button type="button" data-move-lab-marker="${escapeHtml(key)}">Move${labMarkerMenu.moving ? ' ▴' : ' ▾'}</button>${labMarkerMenu.moving ? `<select data-move-lab-marker-to="${escapeHtml(key)}" aria-label="Move ${escapeHtml(marker)} to category"><option value="" selected disabled>Move to…</option>${labCategories().filter((category) => category.name !== activeLabCategory).map((category) => `<option value="${escapeHtml(category.name)}">${escapeHtml(category.name)}</option>`).join('')}</select>` : ''}<button type="button" class="danger" data-delete-lab-marker="${escapeHtml(key)}">Delete</button></div>` : '';
+    const markerEditMenu = labMarkerMenu.key === key ? `<div class="lab-marker-edit-menu"><button type="button" data-edit-lab-units="${escapeHtml(key)}">Edit units</button><button type="button" data-edit-lab-reference="${escapeHtml(key)}">Edit reference</button><button type="button" data-rename-lab-marker="${escapeHtml(key)}">Rename</button><button type="button" data-move-lab-marker="${escapeHtml(key)}">Move${labMarkerMenu.moving ? ' ▴' : ' ▾'}</button>${labMarkerMenu.moving ? `<select data-move-lab-marker-to="${escapeHtml(key)}" aria-label="Move ${escapeHtml(marker)} to category"><option value="" selected disabled>Move to…</option>${labCategories().filter((category) => category.name !== activeLabCategory).map((category) => `<option value="${escapeHtml(category.name)}">${escapeHtml(category.name)}</option>`).join('')}</select>` : ''}<button type="button" class="danger" data-delete-lab-marker="${escapeHtml(key)}">Delete</button></div>` : '';
     return `<tr><th scope="row"><div class="lab-marker-cell"><button class="lab-marker-link" type="button" data-open-marker="${escapeHtml(marker)}"><strong>${escapeHtml(marker)}</strong><small>Chart</small></button><button class="lab-marker-edit-button" type="button" data-edit-lab-marker="${escapeHtml(key)}" aria-label="Edit ${escapeHtml(marker)}" aria-expanded="${labMarkerMenu.key === key}">Edit</button>${markerEditMenu}</div></th>${cells}<td class="lab-matrix-units">${escapeHtml(unitLabel)}</td><td class="lab-matrix-reference">${escapeHtml(reference)}</td></tr>`;
   }).join('');
   const portraitControls = `<div class="lab-portrait-controls" ${portrait ? '' : 'aria-hidden="true"'}><label class="lab-text-size-control"><span>Text size</span><input type="range" min="0.65" max="1" step="0.05" value="${labPortraitTextScale}" aria-label="Lab results text size" data-lab-text-size><output data-lab-text-output>${Math.round(labPortraitTextScale * 100)}%</output></label></div>`;
@@ -1293,7 +1380,7 @@ function renderLabs() {
     localStorage.setItem('thyroid-tracker-lab-text-scale', String(labPortraitTextScale));
   });
   el.querySelectorAll('[data-open-marker]').forEach((button) => button.addEventListener('click', () => openLabDashboard(button.dataset.openMarker)));
-  el.querySelectorAll('[data-edit-lab-marker],[data-move-lab-marker],[data-rename-lab-marker],[data-delete-lab-marker]').forEach((button) => button.addEventListener('click', handleLabMatrixEdit));
+  el.querySelectorAll('[data-edit-lab-marker],[data-edit-lab-units],[data-edit-lab-reference],[data-move-lab-marker],[data-rename-lab-marker],[data-delete-lab-marker]').forEach((button) => button.addEventListener('click', handleLabMatrixEdit));
   el.querySelectorAll('[data-move-lab-marker-to]').forEach((select) => select.addEventListener('change', handleLabMarkerMove));
   el.querySelectorAll('[data-remove-lab]').forEach((button) => button.addEventListener('click', () => { data.labs = data.labs.filter((lab) => lab.id !== button.dataset.removeLab); saveData(); renderLabs(); renderLocalCorrelations(); }));
 }

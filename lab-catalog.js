@@ -150,13 +150,25 @@ export function demographicReference(value, profile = {}) {
   const item = catalogMarkerDefinition(value);
   if (!item) return '';
   const age = profile.age === '' || profile.age === null || profile.age === undefined ? NaN : Number(profile.age);
-  if (Number.isFinite(age) && age < 18) return 'Age-specific; use report interval';
+  if (Number.isFinite(age) && age < 18) return '';
   const sex = profile.sex;
+  if (item.name === 'DHEA sulfate (DHEA-S)') {
+    if (!Number.isFinite(age) || !sex || sex === 'other') return '';
+    const bands = sex === 'female'
+      ? [[18, 29, '45–320'], [30, 39, '40–325'], [40, 49, '25–220'], [50, 59, '15–170'], [60, 200, '10–150']]
+      : [[18, 29, '100–510'], [30, 39, '90–450'], [40, 49, '70–420'], [50, 59, '50–350'], [60, 200, '30–300']];
+    return bands.find(([low, high]) => age >= low && age <= high)?.[2] || '';
+  }
+  if (item.name === 'Sex hormone binding globulin (SHBG)') {
+    if (!Number.isFinite(age) || !sex || sex === 'other') return '';
+    if (sex === 'female') return age < 50 ? '18–144' : '16–120';
+    return age < 50 ? '10–57' : '12–75';
+  }
   if (item.name === 'Erythrocyte sedimentation rate (ESR)' && item.profiles?.[sex]) {
     const older = Number.isFinite(age) && age >= 50;
     return item.profiles[sex].split('; ')[older ? 1 : 0];
   }
-  if (item.profiles) return item.profiles[sex] || 'Sex-specific; use report interval';
+  if (item.profiles) return item.profiles[sex] || '';
   if (item.name === 'TSH' && Number.isFinite(age) && age >= 65) return '0.4–5.0 (older-adult typical; report interval preferred)';
   return item.reference;
 }
