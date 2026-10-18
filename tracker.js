@@ -81,6 +81,7 @@ data.labMarkerAliases ||= {};
 data.labProfile ||= { age: '', sex: '' };
 data.labUnits ||= {};
 data.hiddenLabMarkers ||= {};
+data.labImports ||= {};
 const storedLabReferences = data.labReferences || {};
 data.labReferences = {};
 Object.entries(storedLabReferences).forEach(([marker, reference]) => {
@@ -119,10 +120,11 @@ let lastRoutineTap = { group: '', time: 0 };
 let routineTabHoldTimer = null;
 let suppressRoutineTabClick = false;
 let pendingLabRows = [];
+let pendingLabImport = null;
 
 function saveData() {
   const submittedDays = Object.fromEntries(Object.entries(data.days).filter(([, day]) => day.submitted || Object.keys(day.parts || {}).length || day.draft || day.submissionActions?.length).map(([date, day]) => [date, { submitted: day.submitted, submissionHistory: day.submissionHistory || [], parts: day.parts || {}, draft: day.draft, dirtySections: day.dirtySections || [], submissionActions: day.submissionActions || [], submissionCursor: day.submissionCursor ?? day.submissionActions?.length ?? 0 }]));
-  localStorage.setItem(STORAGE_KEY, JSON.stringify({ days: submittedDays, labs: data.labs || [], labReferences: data.labReferences || {}, customItems: data.customItems || [], customSymptoms: data.customSymptoms || [], doseOverrides: data.doseOverrides || {}, routineOverrides: data.routineOverrides || {}, deletedRoutineItems: data.deletedRoutineItems || [], routineGroups: routineGroups(), desiredRanges: data.desiredRanges || {}, healthByDate: data.healthByDate || {}, labCategories: data.labCategories || defaultLabCategories(), labMarkerAliases: data.labMarkerAliases || {}, hiddenLabMarkers: data.hiddenLabMarkers || {}, labUnits: data.labUnits || {}, labProfile: data.labProfile || {}, puzzle: { ...data.puzzle, rating: undefined } }));
+  localStorage.setItem(STORAGE_KEY, JSON.stringify({ days: submittedDays, labs: data.labs || [], labImports: data.labImports || {}, labReferences: data.labReferences || {}, customItems: data.customItems || [], customSymptoms: data.customSymptoms || [], doseOverrides: data.doseOverrides || {}, routineOverrides: data.routineOverrides || {}, deletedRoutineItems: data.deletedRoutineItems || [], routineGroups: routineGroups(), desiredRanges: data.desiredRanges || {}, healthByDate: data.healthByDate || {}, labCategories: data.labCategories || defaultLabCategories(), labMarkerAliases: data.labMarkerAliases || {}, hiddenLabMarkers: data.hiddenLabMarkers || {}, labUnits: data.labUnits || {}, labProfile: data.labProfile || {}, puzzle: { ...data.puzzle, rating: undefined } }));
 }
 
 function recordSubmissionAction(date, kind, section, before, after, draftBefore) {
@@ -1286,6 +1288,17 @@ function handleLabMarkerMove(event) {
   saveData(); renderLabs();
 }
 
+function removeLabDateFromCategory(event) {
+  const date = event.currentTarget.dataset.removeLabDate;
+  const category = labCategories().find((item) => item.name === activeLabCategory);
+  const markerKeys = new Set((category?.markers || []).map((marker) => markerReferenceKey(marker)));
+  const matching = data.labs.filter((lab) => lab.date === date && markerKeys.has(markerReferenceKey(lab.marker)));
+  if (!matching.length || !confirm(`Delete ${matching.length} lab result${matching.length === 1 ? '' : 's'} dated ${date} from ${activeLabCategory}? Other categories will be unchanged.`)) return;
+  const removedIds = new Set(matching.map((lab) => lab.id));
+  data.labs = data.labs.filter((lab) => !removedIds.has(lab.id));
+  saveData(); renderLabs(); renderLocalCorrelations();
+}
+
 function renameLabCategory() {
   const category = labCategories().find((item) => item.name === labCategoryToManage);
   if (!category) return;
@@ -1505,7 +1518,7 @@ function renderLabs() {
     return `<tr><th scope="row"><div class="lab-marker-cell"><button class="lab-marker-link" type="button" data-open-marker="${escapeHtml(marker)}"><strong>${escapeHtml(marker)}</strong><small>Chart</small></button><button class="lab-marker-edit-button" type="button" data-edit-lab-marker="${escapeHtml(key)}" aria-label="Edit ${escapeHtml(marker)}" aria-expanded="${labMarkerMenu.key === key}">Edit</button>${markerEditMenu}</div></th>${cells}<td class="lab-matrix-units">${escapeHtml(unitLabel)}</td><td class="lab-matrix-reference">${escapeHtml(reference)}</td></tr>`;
   }).join('');
   const portraitControls = `<div class="lab-portrait-controls" ${portrait ? '' : 'aria-hidden="true"'}><label class="lab-text-size-control"><span>Text size</span><input type="range" min="0.65" max="1" step="0.05" value="${labPortraitTextScale}" aria-label="Lab results text size" data-lab-text-size><output data-lab-text-output>${Math.round(labPortraitTextScale * 100)}%</output></label></div>`;
-  el.innerHTML = `${portraitControls}<div class="lab-results-matrix-wrap"><table class="lab-results-matrix"><thead><tr><th scope="col">Biomarker</th>${dates.map((date) => `<th scope="col" class="lab-date-column">${escapeHtml(date)}</th>`).join('')}<th scope="col" class="lab-matrix-units">Units</th><th scope="col" class="lab-matrix-reference">Reference</th></tr></thead><tbody>${bodyRows}</tbody></table></div>`;
+  el.innerHTML = `${portraitControls}<div class="lab-results-matrix-wrap"><table class="lab-results-matrix"><thead><tr><th scope="col">Biomarker</th>${dates.map((date) => `<th scope="col" class="lab-date-column"><span>${escapeHtml(date)}</span><button class="lab-date-remove" type="button" data-remove-lab-date="${escapeHtml(date)}" aria-label="Delete all ${escapeHtml(date)} lab results in ${escapeHtml(activeLabCategory)}" title="Delete ${escapeHtml(date)} results">×</button></th>`).join('')}<th scope="col" class="lab-matrix-units">Units</th><th scope="col" class="lab-matrix-reference">Reference</th></tr></thead><tbody>${bodyRows}</tbody></table></div>`;
   updateLabTextScale();
   el.querySelector('[data-lab-text-size]').addEventListener('input', (event) => {
     labPortraitTextScale = Number(event.target.value);
@@ -1516,6 +1529,7 @@ function renderLabs() {
   el.querySelectorAll('[data-open-marker]').forEach((button) => button.addEventListener('click', () => openLabDashboard(button.dataset.openMarker)));
   el.querySelectorAll('[data-edit-lab-marker],[data-edit-lab-units],[data-edit-lab-reference],[data-move-lab-marker],[data-rename-lab-marker],[data-delete-lab-marker],[data-merge-lab-marker-start],[data-merge-lab-marker-confirm]').forEach((button) => button.addEventListener('click', handleLabMatrixEdit));
   el.querySelectorAll('[data-move-lab-marker-to]').forEach((select) => select.addEventListener('change', handleLabMarkerMove));
+  el.querySelectorAll('[data-remove-lab-date]').forEach((button) => button.addEventListener('click', removeLabDateFromCategory));
   el.querySelectorAll('[data-remove-lab]').forEach((button) => button.addEventListener('click', () => { data.labs = data.labs.filter((lab) => lab.id !== button.dataset.removeLab); saveData(); renderLabs(); renderLocalCorrelations(); }));
 }
 
@@ -1786,17 +1800,76 @@ function confirmLabPdfImport() {
   selected.forEach((row, index) => {
     imported[index].reference = row.querySelector('[data-field="reference"]').value.trim();
   });
-  applyCanonicalLabReferences(imported, true);
-  data.labs.push(...imported);
-  saveData(); renderLabs(); renderLocalCorrelations();
+  const accepted = commitImportedLabRows(imported, pendingLabImport, true);
   document.getElementById('labPdfReview').close();
-  document.getElementById('labImportStatus').textContent = `${imported.length} result${imported.length === 1 ? '' : 's'} added from PDF. The file was read locally.`;
+  document.getElementById('labImportStatus').textContent = accepted ? `${imported.length} result${imported.length === 1 ? '' : 's'} added from PDF. The file was read locally.` : 'PDF import cancelled; saved results were left unchanged.';
   pendingLabRows = [];
-  toast(`${imported.length} PDF lab result${imported.length === 1 ? '' : 's'} imported locally.`);
+  pendingLabImport = null;
+}
+
+async function labFileFingerprint(file) {
+  const contents = await file.arrayBuffer();
+  if (globalThis.crypto?.subtle) {
+    const digest = await crypto.subtle.digest('SHA-256', contents);
+    return [...new Uint8Array(digest)].map((byte) => byte.toString(16).padStart(2, '0')).join('');
+  }
+  return `${file.name}:${file.size}:${file.lastModified}`;
+}
+
+function labResultDuplicateKey(lab) {
+  return [markerReferenceKey(lab.marker), lab.date, Number(lab.value), String(lab.units || '').trim().toLowerCase()].join('|');
+}
+
+function commitImportedLabRows(rows, source, useProvidedReference = false) {
+  const prepared = rows.map((row) => {
+    row.marker = ensureCatalogMarker(canonicalUserLabMarker(canonicalLabMarker(row.marker)));
+    standardizeAppLabResult(row);
+    return row;
+  });
+  const previousFileRows = source?.fingerprint ? data.labs.filter((lab) => lab.importSourceHash === source.fingerprint) : [];
+  const priorImport = source?.fingerprint ? data.labImports?.[source.fingerprint] : null;
+  const wasImported = Boolean(priorImport || previousFileRows.length);
+  if (wasImported && !confirm(`${source.fileName} appears to have already been imported${previousFileRows.length ? ` (${previousFileRows.length} saved results)` : ''}. Replace the results from that file? Choose Cancel to keep them unchanged.`)) {
+    toast('Import cancelled; existing lab results were left unchanged.');
+    return false;
+  }
+  const replacedIds = new Set(previousFileRows.map((lab) => lab.id));
+  const existingKeys = new Set(data.labs.filter((lab) => !replacedIds.has(lab.id)).map(labResultDuplicateKey));
+  const seen = new Set();
+  const fresh = prepared.filter((lab) => {
+    const key = labResultDuplicateKey(lab);
+    if (seen.has(key) || (!previousFileRows.length && existingKeys.has(key))) return false;
+    seen.add(key);
+    return true;
+  });
+  data.labs = data.labs.filter((lab) => !replacedIds.has(lab.id));
+  if (!fresh.length) {
+    if (wasImported) {
+      data.labImports[source.fingerprint] = { fileName: source.fileName, importedAt: new Date().toISOString() };
+      saveData(); renderLabs(); renderLocalCorrelations();
+      toast('The previous import was replaced; it contained no new numeric results.');
+      return true;
+    }
+    toast('These lab results are already saved; no duplicates were added.');
+    return false;
+  }
+  fresh.forEach((lab) => {
+    if (source?.fingerprint) {
+      lab.importSourceHash = source.fingerprint;
+      lab.importFileName = source.fileName;
+    }
+  });
+  if (source?.fingerprint) data.labImports[source.fingerprint] = { fileName: source.fileName, importedAt: new Date().toISOString(), resultCount: fresh.length };
+  applyCanonicalLabReferences(fresh, useProvidedReference);
+  data.labs.push(...fresh);
+  saveData(); renderLabs(); renderLocalCorrelations();
+  toast(`${fresh.length} result${fresh.length === 1 ? '' : 's'} imported locally${prepared.length > fresh.length ? `; skipped ${prepared.length - fresh.length} duplicate${prepared.length - fresh.length === 1 ? '' : 's'}` : ''}.`);
+  return true;
 }
 
 async function importLabs(file) {
   if (!file) return;
+  const source = { fingerprint: await labFileFingerprint(file), fileName: file.name };
   if (/\.pdf$/i.test(file.name) || file.type === 'application/pdf') {
     const status = document.getElementById('labImportStatus');
     status.hidden = false;
@@ -1805,6 +1878,7 @@ async function importLabs(file) {
       const rows = await readPdfLabRows(file);
       if (!rows.length) { status.textContent = 'No lab rows were recognized. This can happen with a scanned PDF or a report layout/units the importer does not recognize; it does not necessarily mean the PDF is scanned. The file stayed on this device. Try selecting and copying report text to confirm it is searchable. A redacted sample PDF or copied result lines would help us adapt the importer.'; toast('No lab rows recognized; check whether text can be selected in the PDF.'); return; }
       pendingLabRows = rows;
+      pendingLabImport = source;
       status.textContent = `${rows.length} possible rows extracted locally. Review before adding.`;
       renderLabPdfReview(rows, file.name);
     } catch (error) {
@@ -1815,7 +1889,7 @@ async function importLabs(file) {
   }
   if (!/\.(csv|txt)$/i.test(file.name)) { toast('Choose a PDF, CSV, or text file.'); return; }
   const reader = new FileReader();
-  reader.onload = () => { const rows = parseLabText(String(reader.result)); if (!rows.length) { toast('No lab results recognized. Check that the CSV includes biomarker names, dates, and numeric results.'); return; } applyCanonicalLabReferences(rows); data.labs.push(...rows); saveData(); renderLabs(); renderLocalCorrelations(); toast(`${rows.length} results imported locally.`); };
+  reader.onload = () => { const rows = parseLabText(String(reader.result)); if (!rows.length) { toast('No lab results recognized. Check that the CSV includes biomarker names, dates, and numeric results.'); return; } commitImportedLabRows(rows, source); };
   reader.readAsText(file);
 }
 
@@ -2052,9 +2126,9 @@ document.getElementById('closeLabCategoryMenu').addEventListener('click', () => 
 document.getElementById('labCategoryMenu').addEventListener('click', (event) => { if (event.target === event.currentTarget) event.currentTarget.close(); });
 document.getElementById('labImport').addEventListener('change', (event) => { importLabs(event.target.files[0]); event.target.value = ''; });
 document.getElementById('confirmLabPdfImport').addEventListener('click', confirmLabPdfImport);
-document.getElementById('cancelLabPdfImport').addEventListener('click', () => { pendingLabRows = []; document.getElementById('labPdfReview').close(); });
-document.getElementById('closeLabPdfReview').addEventListener('click', () => { pendingLabRows = []; document.getElementById('labPdfReview').close(); });
-document.getElementById('labPdfReview').addEventListener('click', (event) => { if (event.target === event.currentTarget) { pendingLabRows = []; event.currentTarget.close(); } });
+document.getElementById('cancelLabPdfImport').addEventListener('click', () => { pendingLabRows = []; pendingLabImport = null; document.getElementById('labPdfReview').close(); });
+document.getElementById('closeLabPdfReview').addEventListener('click', () => { pendingLabRows = []; pendingLabImport = null; document.getElementById('labPdfReview').close(); });
+document.getElementById('labPdfReview').addEventListener('click', (event) => { if (event.target === event.currentTarget) { pendingLabRows = []; pendingLabImport = null; event.currentTarget.close(); } });
 document.getElementById('labTimeFilter').addEventListener('change', renderLabs);
 document.getElementById('detailTimeFilter').addEventListener('change', drawLabGraph);
 document.getElementById('saveDesiredRange').addEventListener('click', saveMarkerRange);
