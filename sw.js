@@ -1,5 +1,5 @@
-const CACHE_NAME = 'thyroid-tracker-v112';
-const APP_SHELL = ['./', './index.html', './tracker.css', './correlations.css', './enhancements.css?v=7', './workflow.css?v=6', './routine-tabs.css?v=8', './challenge.css?v=6', './routine-management.css?v=4', './analysis.css?v=2', './routine-edit.css?v=7', './lab-pdf.css?v=28', './lab-catalog.js', './folders.css?v=1', './tracker.js?v=35', './analysis.js?v=2', './folders.js?v=1', './quick-update.js', './lab-pdf.js', './pdf.min.mjs', './pdf.worker.min.mjs', './wisdom.js', './puzzles.json', './chess-engine.js', './manifest.webmanifest', './app-icon.svg', './app-icon.png'];
+const CACHE_NAME = 'thyroid-tracker-v113';
+const APP_SHELL = ['./', './index.html', './tracker.css', './correlations.css', './enhancements.css?v=7', './workflow.css?v=6', './routine-tabs.css?v=8', './challenge.css?v=6', './routine-management.css?v=4', './analysis.css?v=2', './routine-edit.css?v=7', './lab-pdf.css?v=28', './lab-catalog.js', './folders.css?v=1', './tracker.js?v=36', './analysis.js?v=2', './folders.js?v=1', './quick-update.js', './lab-pdf.js', './pdf.min.mjs', './pdf.worker.min.mjs', './wisdom.js', './puzzles.json', './chess-engine.js', './manifest.webmanifest', './app-icon.svg', './app-icon.png'];
 
 self.addEventListener('install', (event) => {
   event.waitUntil(caches.open(CACHE_NAME).then((cache) => cache.addAll(APP_SHELL)));

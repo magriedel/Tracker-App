@@ -107,7 +107,7 @@ let labPortraitTextScale = Math.min(1, Math.max(0.65, Number(localStorage.getIte
 let activeRoutineGroup = TIME_GROUPS[0][0];
 let activeLabCategory = 'Thyroid';
 let labCategoryToManage = '';
-let labMarkerMenu = { key: '', moving: false };
+let labMarkerMenu = { key: '', moving: false, merging: false };
 let labCategoryHoldTimer = null;
 let lastLabCategoryTap = { name: '', time: 0 };
 let suppressLabCategoryClick = false;
@@ -1118,6 +1118,17 @@ function handleLabMatrixEdit(event) {
     renderLabs();
     return;
   }
+  if (action.mergeLabMarkerStart) {
+    labMarkerMenu.merging = !labMarkerMenu.merging;
+    renderLabs();
+    return;
+  }
+  if (action.mergeLabMarkerConfirm) {
+    const select = document.querySelector(`[data-merge-lab-marker-to="${CSS.escape(action.mergeLabMarkerConfirm)}"]`);
+    if (!select?.value) { toast('Choose the biomarker to keep.'); return; }
+    if (mergeLabMarkers(action.mergeLabMarkerConfirm, select.value)) toast('Results merged into the selected biomarker.');
+    return;
+  }
   if (action.editLabUnits || action.editLabReference) {
     const key = action.editLabUnits || action.editLabReference;
     const marker = labCategories().flatMap((category) => category.markers).find((name) => markerReferenceKey(name) === key);
@@ -1273,7 +1284,11 @@ function mergeLabMarkers(sourceKey, targetKey) {
   const targetMarker = canonicalUserLabMarker(target.marker);
   const targetCategory = labCategories().find((category) => category.markers.some((name) => markerReferenceKey(name) === targetKey));
   labCategories().forEach((category) => { category.markers = category.markers.filter((name) => markerReferenceKey(name) !== sourceKey); });
-  data.labs.forEach((lab) => { if (markerReferenceKey(lab.marker) === sourceKey) lab.marker = targetMarker; });
+  data.labs.forEach((lab) => {
+    if (markerReferenceKey(lab.marker) !== sourceKey) return;
+    lab.marker = targetMarker;
+    standardizeAppLabResult(lab);
+  });
   data.labMarkerAliases[sourceKey] = { name: targetMarker, key: targetKey };
   if (targetCategory && !targetCategory.markers.some((name) => markerReferenceKey(name) === targetKey)) targetCategory.markers.push(targetMarker);
   data.labReferences ||= {};
@@ -1383,7 +1398,9 @@ function renderLabs() {
       }).join('');
       return `<td class="lab-date-cell ${dateClass}">${values}</td>`;
     }).join('');
-    const markerEditMenu = labMarkerMenu.key === key ? `<div class="lab-marker-edit-menu"><button type="button" data-edit-lab-units="${escapeHtml(key)}">Edit units</button><button type="button" data-edit-lab-reference="${escapeHtml(key)}">Edit reference</button><button type="button" data-rename-lab-marker="${escapeHtml(key)}">Rename</button><button type="button" data-move-lab-marker="${escapeHtml(key)}">Move${labMarkerMenu.moving ? ' ▴' : ' ▾'}</button>${labMarkerMenu.moving ? `<select data-move-lab-marker-to="${escapeHtml(key)}" aria-label="Move ${escapeHtml(marker)} to category"><option value="" selected disabled>Move to…</option>${labCategories().filter((category) => category.name !== activeLabCategory).map((category) => `<option value="${escapeHtml(category.name)}">${escapeHtml(category.name)}</option>`).join('')}</select>` : ''}<button type="button" class="danger" data-delete-lab-marker="${escapeHtml(key)}">Delete</button></div>` : '';
+    const otherMarkers = labCategories().flatMap((category) => category.markers).filter((name) => markerReferenceKey(name) !== key);
+    const mergeOptions = otherMarkers.map((name) => `<option value="${escapeHtml(markerReferenceKey(name))}">${escapeHtml(name)}</option>`).join('');
+    const markerEditMenu = labMarkerMenu.key === key ? `<div class="lab-marker-edit-menu"><button type="button" data-edit-lab-units="${escapeHtml(key)}">Edit units</button><button type="button" data-edit-lab-reference="${escapeHtml(key)}">Edit reference</button><button type="button" data-rename-lab-marker="${escapeHtml(key)}">Rename</button><button type="button" data-move-lab-marker="${escapeHtml(key)}">Move${labMarkerMenu.moving ? ' ▴' : ' ▾'}</button>${labMarkerMenu.moving ? `<select data-move-lab-marker-to="${escapeHtml(key)}" aria-label="Move ${escapeHtml(marker)} to category"><option value="" selected disabled>Move to…</option>${labCategories().filter((category) => category.name !== activeLabCategory).map((category) => `<option value="${escapeHtml(category.name)}">${escapeHtml(category.name)}</option>`).join('')}</select>` : ''}<button type="button" data-merge-lab-marker-start="${escapeHtml(key)}">Merge with…</button>${labMarkerMenu.merging ? `<select data-merge-lab-marker-to="${escapeHtml(key)}" aria-label="Merge ${escapeHtml(marker)} into another biomarker"><option value="" selected disabled>Choose biomarker…</option>${mergeOptions}</select><button type="button" class="danger" data-merge-lab-marker-confirm="${escapeHtml(key)}">Merge results</button>` : ''}<button type="button" class="danger" data-delete-lab-marker="${escapeHtml(key)}">Delete</button></div>` : '';
     return `<tr><th scope="row"><div class="lab-marker-cell"><button class="lab-marker-link" type="button" data-open-marker="${escapeHtml(marker)}"><strong>${escapeHtml(marker)}</strong><small>Chart</small></button><button class="lab-marker-edit-button" type="button" data-edit-lab-marker="${escapeHtml(key)}" aria-label="Edit ${escapeHtml(marker)}" aria-expanded="${labMarkerMenu.key === key}">Edit</button>${markerEditMenu}</div></th>${cells}<td class="lab-matrix-units">${escapeHtml(unitLabel)}</td><td class="lab-matrix-reference">${escapeHtml(reference)}</td></tr>`;
   }).join('');
   const portraitControls = `<div class="lab-portrait-controls" ${portrait ? '' : 'aria-hidden="true"'}><label class="lab-text-size-control"><span>Text size</span><input type="range" min="0.65" max="1" step="0.05" value="${labPortraitTextScale}" aria-label="Lab results text size" data-lab-text-size><output data-lab-text-output>${Math.round(labPortraitTextScale * 100)}%</output></label></div>`;
@@ -1396,7 +1413,7 @@ function renderLabs() {
     localStorage.setItem('thyroid-tracker-lab-text-scale', String(labPortraitTextScale));
   });
   el.querySelectorAll('[data-open-marker]').forEach((button) => button.addEventListener('click', () => openLabDashboard(button.dataset.openMarker)));
-  el.querySelectorAll('[data-edit-lab-marker],[data-edit-lab-units],[data-edit-lab-reference],[data-move-lab-marker],[data-rename-lab-marker],[data-delete-lab-marker]').forEach((button) => button.addEventListener('click', handleLabMatrixEdit));
+  el.querySelectorAll('[data-edit-lab-marker],[data-edit-lab-units],[data-edit-lab-reference],[data-move-lab-marker],[data-rename-lab-marker],[data-delete-lab-marker],[data-merge-lab-marker-start],[data-merge-lab-marker-confirm]').forEach((button) => button.addEventListener('click', handleLabMatrixEdit));
   el.querySelectorAll('[data-move-lab-marker-to]').forEach((select) => select.addEventListener('change', handleLabMarkerMove));
   el.querySelectorAll('[data-remove-lab]').forEach((button) => button.addEventListener('click', () => { data.labs = data.labs.filter((lab) => lab.id !== button.dataset.removeLab); saveData(); renderLabs(); renderLocalCorrelations(); }));
 }

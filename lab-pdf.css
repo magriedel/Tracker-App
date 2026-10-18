@@ -73,6 +73,7 @@
 .lab-marker-edit-menu button:hover{background:var(--mint)}
 .lab-marker-edit-menu .danger{color:#a33c35}
 .lab-marker-edit-menu select{max-width:160px;border:1px solid var(--line);border-radius:4px}
+.lab-marker-edit-menu [data-merge-lab-marker-to]{max-width:190px}
 .lab-results-matrix .lab-marker-link strong{font-size:calc(.75rem * var(--lab-text-scale));line-height:1.2;overflow-wrap:anywhere}
 .lab-results-matrix .lab-marker-link small{color:var(--muted);font-size:calc(.61rem * var(--lab-text-scale));font-weight:500}
 .lab-results-matrix .lab-date-result{display:grid;grid-template-columns:1fr;justify-items:center;gap:2px;white-space:normal;text-align:center;font-size:calc(.74rem * var(--lab-text-scale))}
