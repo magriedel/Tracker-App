@@ -135,15 +135,32 @@ function combinedRoutine() {
 function routineGroups() { return [...new Set([...(data.routineGroups?.length ? data.routineGroups : TIME_GROUPS.map(([group]) => group)), ...(data.customItems || []).map((item) => data.routineOverrides?.[item.id]?.group ?? item.group)])]; }
 function allSymptoms() { return [...SYMPTOMS, ...(data.customSymptoms || [])]; }
 
+function carryForwardEntry(day) {
+  if (!day) return null;
+  if (day.submitted) return day.submitted;
+  const carried = { routine: [] };
+  const checkinParts = day.parts?.checkin;
+  const latestCheckin = Array.isArray(checkinParts) ? checkinParts[checkinParts.length - 1] : checkinParts;
+  if (latestCheckin?.entry) Object.assign(carried, latestCheckin.entry);
+  const routineById = new Map();
+  Object.entries(day.parts || {}).forEach(([group, history]) => {
+    if (group === 'checkin') return;
+    const latest = Array.isArray(history) ? history[history.length - 1] : history;
+    (latest?.items || []).forEach((item) => routineById.set(item.id, item));
+  });
+  carried.routine = [...routineById.values()];
+  return carried.routine.length || latestCheckin?.entry ? carried : null;
+}
+
 function getDay(date = activeDate) {
   if (!data.days[date]) {
-    const prior = data.days[previousDay(date)];
-    data.days[date] = { draft: makeDraft(combinedRoutine(), prior?.submitted), submitted: null, parts: {}, dirtySections: [] };
+    const prior = carryForwardEntry(data.days[previousDay(date)]);
+    data.days[date] = { draft: makeDraft(combinedRoutine(), prior), submitted: null, parts: {}, dirtySections: [] };
   } else if (!data.days[date].draft) {
     const day = data.days[date];
-    const prior = data.days[previousDay(date)];
+    const prior = carryForwardEntry(data.days[previousDay(date)]);
     const submitted = day.submitted;
-    day.draft = makeDraft(combinedRoutine(), submitted || prior?.submitted);
+    day.draft = makeDraft(combinedRoutine(), submitted || prior);
     if (submitted) {
       const savedItems = new Map((submitted.routine || []).map((item) => [item.id, item]));
       day.draft.routine = combinedRoutine().map((item) => ({ ...item, ...(savedItems.get(item.id) || {}) }));
