@@ -19,7 +19,7 @@
     <link rel="stylesheet" href="./routine-management.css?v=4" />
     <link rel="stylesheet" href="./analysis.css?v=1" />
     <link rel="stylesheet" href="./routine-edit.css?v=7" />
-    <link rel="stylesheet" href="./lab-pdf.css?v=25" />
+    <link rel="stylesheet" href="./lab-pdf.css?v=26" />
     <link rel="stylesheet" href="./folders.css?v=1" />
     <title>Thyroid Tracker</title>
   </head>
@@ -66,7 +66,6 @@
         <section class="screen" id="screen-labs" role="tabpanel" aria-labelledby="tab-labs" hidden>
           <div class="screen-heading compact-heading"><h2>Labs</h2><button id="exportCsvBtn" class="button secondary small" type="button">Export CSV</button></div>
           <details class="lab-profile-tools"><summary>Age and gender</summary><form id="labProfileForm" class="lab-profile-form"><label class="field"><span>Age</span><input id="labProfileAge" type="number" min="0" max="120" step="1" placeholder="Years" /></label><label class="field"><span>Gender for reference intervals</span><select id="labProfileSex"><option value="">Not specified</option><option value="female">Female</option><option value="male">Male</option><option value="other">Other / prefer not to say</option></select></label><button class="button secondary" type="submit">Save</button></form></details>
-          <nav id="labCategoryTabs" class="lab-category-tabs" aria-label="Biomarker categories" role="tablist"></nav>
           <div class="lab-toolbar"><div class="lab-entry-actions"><details class="lab-entry-details"><summary>＋ Add lab result</summary><form id="labForm" class="lab-form">
             <label class="field"><span>Marker</span><input id="labMarker" list="markerOptions" required placeholder="e.g. TSH" /><datalist id="markerOptions"><option>TSH</option><option>Free T4</option><option>Free T3</option><option>TRAb</option><option>TSI</option></datalist></label>
             <label class="field"><span>Result date</span><input id="labDate" type="date" required /></label>
@@ -76,6 +75,7 @@
             <label class="field"><span>Desired low</span><input id="labDesiredLow" type="number" step="any" placeholder="Optional" /></label><label class="field"><span>Desired high</span><input id="labDesiredHigh" type="number" step="any" placeholder="Optional" /></label>
             <button class="button primary" type="submit">Add result</button>
           </form></details><label class="button secondary lab-import-button" for="labImport">Import PDF / CSV</label><input id="labImport" type="file" accept=".pdf,application/pdf,.csv,.txt,text/csv,text/plain" hidden /></div><label class="field compact-field lab-timeframe"><span>Show timeframe</span><select id="labTimeFilter"><option value="all">All results</option><option value="90">Last 90 days</option><option value="365">Last year</option><option value="1825">Last 5 years</option></select></label></div><p id="labImportStatus" class="fine-print" role="status" hidden></p>
+          <nav id="labCategoryTabs" class="lab-category-tabs" aria-label="Biomarker categories" role="tablist"></nav>
           <div id="labDashboard" class="lab-dashboard"></div>
         </section>
 
@@ -104,9 +104,10 @@
       <dialog id="labDetailDialog" class="lab-detail-dialog"><div class="dialog-heading"><div><p class="eyebrow">Marker dashboard</p><h2 id="detailMarkerTitle">Lab marker</h2></div><button id="closeLabDialog" class="icon-button" type="button" aria-label="Exit dashboard">Done</button></div><label class="field compact-field"><span>Timeframe</span><select id="detailTimeFilter"><option value="all">All results</option><option value="90">Last 90 days</option><option value="365">Last year</option><option value="1825">Last 5 years</option></select></label><div id="labGraph" class="lab-graph"></div><div class="field-pair range-edit"><label class="field"><span>Desired low</span><input id="detailDesiredLow" type="number" step="any" /></label><label class="field"><span>Desired high</span><input id="detailDesiredHigh" type="number" step="any" /></label></div><button id="saveDesiredRange" class="button primary" type="button">Save desired range</button></dialog>
       <dialog id="labPdfReview" class="lab-pdf-review" aria-labelledby="labPdfTitle"><div class="dialog-heading"><div><p class="eyebrow">Review local extraction</p><h2 id="labPdfTitle">PDF lab results</h2></div><button id="closeLabPdfReview" class="icon-button" type="button" aria-label="Cancel PDF import">Cancel</button></div><p id="labPdfSummary" class="fine-print"></p><div class="lab-pdf-table-wrap"><table class="lab-pdf-table"><thead><tr><th>Add</th><th>Result</th><th>Marker</th><th>Date</th><th>Value</th><th>Flag</th><th>Units</th><th>App reference (shared)</th></tr></thead><tbody id="labPdfRows"></tbody></table></div><div class="lab-pdf-actions"><button id="confirmLabPdfImport" class="button primary" type="button">Add selected results</button><button id="cancelLabPdfImport" class="button secondary" type="button">Cancel</button></div></dialog>
       <dialog id="routineGroupMenu" class="routine-group-menu"><div class="dialog-heading"><div><p class="eyebrow">Routine tab</p><h2 id="routineGroupMenuTitle">Time of day</h2></div><button id="closeRoutineGroupMenu" class="icon-button" type="button" aria-label="Close tab menu">Done</button></div><div class="routine-group-menu-actions"><button id="renameRoutineGroup" class="button secondary" type="button">Rename tab</button><button id="deleteRoutineGroup" class="button danger-button" type="button">Delete tab</button></div></dialog>
+      <dialog id="labCategoryMenu" class="routine-group-menu"><div class="dialog-heading"><div><p class="eyebrow">Biomarker category</p><h2 id="labCategoryMenuTitle">Category</h2></div><button id="closeLabCategoryMenu" class="icon-button" type="button" aria-label="Close category menu">Done</button></div><div class="routine-group-menu-actions"><button id="renameLabCategory" class="button secondary" type="button">Rename category</button><button id="deleteLabCategory" class="button danger-button" type="button">Delete category</button></div></dialog>
       <div id="toast" class="toast" role="status" aria-live="polite"></div>
     </div>
-    <script type="module" src="./tracker.js?v=28"></script>
+    <script type="module" src="./tracker.js?v=29"></script>
     <script type="module" src="./folders.js?v=1"></script>
   </body>
 </html>
