@@ -1,3 +1,4 @@
+.challenge-header-actions{display:flex;align-items:center;gap:5px}.challenge-header-actions .icon-button:disabled{opacity:.4;cursor:not-allowed}
 .momentum-dialog {
   width: min(900px, calc(100% - 28px));
   max-width: 900px;

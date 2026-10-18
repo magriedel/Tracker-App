@@ -53,7 +53,7 @@ function loadData() {
   try {
     const saved = JSON.parse(localStorage.getItem(STORAGE_KEY));
     if (saved?.days && Array.isArray(saved.labs)) {
-      const submittedDays = Object.fromEntries(Object.entries(saved.days).filter(([, day]) => day.submitted || Object.keys(day.parts || {}).length).map(([date, day]) => [date, { submitted: day.submitted, submissionHistory: day.submissionHistory || [], parts: day.parts || {} }]));
+      const submittedDays = Object.fromEntries(Object.entries(saved.days).filter(([, day]) => day.submitted || Object.keys(day.parts || {}).length || day.draft || day.submissionActions?.length).map(([date, day]) => [date, { submitted: day.submitted, submissionHistory: day.submissionHistory || [], parts: day.parts || {}, draft: day.draft, dirtySections: day.dirtySections || [], submissionActions: day.submissionActions || [], submissionCursor: day.submissionCursor ?? day.submissionActions?.length ?? 0 }]));
       const puzzle = { solved: 0, streak: 0, bestStreak: 0, targetRating: saved.puzzle?.rating ?? 1200, ...saved.puzzle };
       if (!puzzle.targetRating || (puzzle.solved === 0 && puzzle.targetRating === 800)) puzzle.targetRating = 1200;
       return { doseOverrides: {}, routineOverrides: {}, deletedRoutineItems: [], routineGroups: TIME_GROUPS.map(([group]) => group), healthByDate: {}, customSymptoms: [], puzzle: { solved: 0, streak: 0, bestStreak: 0, targetRating: 1200 }, ...saved, puzzle, days: submittedDays };
@@ -121,8 +121,83 @@ let suppressRoutineTabClick = false;
 let pendingLabRows = [];
 
 function saveData() {
-  const submittedDays = Object.fromEntries(Object.entries(data.days).filter(([, day]) => day.submitted || Object.keys(day.parts || {}).length).map(([date, day]) => [date, { submitted: day.submitted, submissionHistory: day.submissionHistory || [], parts: day.parts || {} }]));
+  const submittedDays = Object.fromEntries(Object.entries(data.days).filter(([, day]) => day.submitted || Object.keys(day.parts || {}).length || day.draft || day.submissionActions?.length).map(([date, day]) => [date, { submitted: day.submitted, submissionHistory: day.submissionHistory || [], parts: day.parts || {}, draft: day.draft, dirtySections: day.dirtySections || [], submissionActions: day.submissionActions || [], submissionCursor: day.submissionCursor ?? day.submissionActions?.length ?? 0 }]));
   localStorage.setItem(STORAGE_KEY, JSON.stringify({ days: submittedDays, labs: data.labs || [], labReferences: data.labReferences || {}, customItems: data.customItems || [], customSymptoms: data.customSymptoms || [], doseOverrides: data.doseOverrides || {}, routineOverrides: data.routineOverrides || {}, deletedRoutineItems: data.deletedRoutineItems || [], routineGroups: routineGroups(), desiredRanges: data.desiredRanges || {}, healthByDate: data.healthByDate || {}, labCategories: data.labCategories || defaultLabCategories(), labMarkerAliases: data.labMarkerAliases || {}, hiddenLabMarkers: data.hiddenLabMarkers || {}, labUnits: data.labUnits || {}, labProfile: data.labProfile || {}, puzzle: { ...data.puzzle, rating: undefined } }));
+}
+
+function recordSubmissionAction(date, kind, section, before, after, draftBefore) {
+  const day = data.days[date];
+  day.submissionActions ||= [];
+  day.submissionCursor ??= day.submissionActions.length;
+  day.submissionActions = day.submissionActions.slice(0, day.submissionCursor);
+  day.submissionActions.push({ kind, section, before: JSON.parse(JSON.stringify(before)), after: JSON.parse(JSON.stringify(after)), draftBefore: JSON.parse(JSON.stringify(draftBefore)) });
+  if (day.submissionActions.length > 30) day.submissionActions.shift();
+  day.submissionCursor = day.submissionActions.length;
+}
+
+function updateSubmissionHistoryButtons() {
+  const day = data.days?.[activeDate];
+  const actions = day?.submissionActions || [];
+  const cursor = day?.submissionCursor ?? actions.length;
+  const undo = document.getElementById('undoSubmission');
+  const redo = document.getElementById('redoSubmission');
+  if (undo) undo.disabled = cursor <= 0;
+  if (redo) redo.disabled = cursor >= actions.length;
+  const dialogUndo = document.getElementById('undoSubmissionDialog');
+  const dialogRedo = document.getElementById('redoSubmissionDialog');
+  if (dialogUndo) dialogUndo.disabled = cursor <= 0;
+  if (dialogRedo) dialogRedo.disabled = cursor >= actions.length;
+}
+
+function applySubmissionAction(date, action, useAfter) {
+  const day = data.days[date];
+  if (!day || !action) return;
+  const value = useAfter ? action.after : action.before;
+  if (action.kind === 'day') {
+    day.submitted = JSON.parse(JSON.stringify(value.submitted));
+    day.draft = JSON.parse(JSON.stringify(value.draft));
+    day.dirtySections = [...(value.dirtySections || [])];
+    day.submissionHistory = JSON.parse(JSON.stringify(value.submissionHistory || []));
+    day.dirty = Boolean(day.dirtySections.length);
+  } else if (action.kind === 'section') {
+    day.parts ||= {};
+    if (value.part === undefined) delete day.parts[action.section];
+    else day.parts[action.section] = JSON.parse(JSON.stringify(value.part));
+    day.draft = JSON.parse(JSON.stringify(value.draft));
+    day.dirtySections = [...(value.dirtySections || [])];
+    day.dirty = Boolean(day.dirtySections.length);
+  }
+  saveData();
+}
+
+function undoSubmission() {
+  const day = data.days?.[activeDate];
+  if (!day) return;
+  const actions = day.submissionActions || [];
+  const cursor = day.submissionCursor ?? actions.length;
+  if (cursor <= 0) return;
+  const action = actions[cursor - 1];
+  applySubmissionAction(activeDate, action, false);
+  day.submissionCursor = cursor - 1;
+  saveData();
+  setDate(activeDate);
+  renderMomentum(); renderLocalCorrelations(); updateSubmissionHistoryButtons();
+  toast(`Undid ${action.kind === 'day' ? 'day' : action.section} submission.`);
+}
+
+function redoSubmission() {
+  const day = data.days?.[activeDate];
+  if (!day) return;
+  const actions = day.submissionActions || [];
+  const cursor = day.submissionCursor ?? actions.length;
+  if (cursor >= actions.length) return;
+  const action = actions[cursor];
+  applySubmissionAction(activeDate, action, true);
+  day.submissionCursor = cursor + 1;
+  saveData();
+  setDate(activeDate);
+  renderMomentum(); renderLocalCorrelations(); updateSubmissionHistoryButtons();
+  toast(`Redid ${action.kind === 'day' ? 'day' : action.section} submission.`);
 }
 
 function previousDay(date) { const day = new Date(`${date}T12:00:00`); day.setDate(day.getDate() - 1); return `${day.getFullYear()}-${String(day.getMonth() + 1).padStart(2, '0')}-${String(day.getDate()).padStart(2, '0')}`; }
@@ -258,7 +333,8 @@ function installPuzzle(puzzle) {
   source.hidden = !currentPuzzle.sourceUrl;
   source.href = currentPuzzle.sourceUrl || '#';
   source.textContent = currentPuzzle.sourceUrl ? 'Puzzle source: Lichess' : '';
-  document.getElementById('fortuneReveal').hidden = true;
+  const fortuneReveal = document.getElementById('fortuneReveal');
+  if (fortuneReveal) fortuneReveal.hidden = true;
   renderPuzzle();
 }
 
@@ -582,18 +658,24 @@ function deleteRoutineGroup() {
 
 function submitRoutinePart() {
   const day = getDay(); day.parts ||= {};
+  const draftBefore = JSON.parse(JSON.stringify(day.draft));
   const previous = day.parts[activeRoutineGroup]; const history = Array.isArray(previous) ? previous : previous ? [previous] : [];
   day.parts[activeRoutineGroup] = [...history, { items: draft().routine.filter((item) => item.group === activeRoutineGroup).map((item) => ({ ...item })), submittedAt: new Date().toISOString() }];
-    day.dirtySections = (day.dirtySections || []).filter((section) => section !== `routine:${activeRoutineGroup}`);
-  saveData(); updateStatus(); renderRoutine(); toast(`${activeRoutineGroup} saved for ${activeDate}.`);
+  const previousDirtySections = [...(day.dirtySections || [])];
+  day.dirtySections = previousDirtySections.filter((section) => section !== `routine:${activeRoutineGroup}`);
+  recordSubmissionAction(activeDate, 'section', activeRoutineGroup, { part: previous, draft: draftBefore, dirtySections: previousDirtySections }, { part: day.parts[activeRoutineGroup], draft: day.draft, dirtySections: day.dirtySections }, draftBefore);
+  saveData(); updateStatus(); updateSubmissionHistoryButtons(); renderRoutine(); toast(`${activeRoutineGroup} saved for ${activeDate}.`);
 }
 
 function submitCheckinPart() {
   const day = getDay(); day.parts ||= {};
+  const draftBefore = JSON.parse(JSON.stringify(day.draft));
   const previous = day.parts.checkin; const history = Array.isArray(previous) ? previous : previous ? [previous] : [];
   day.parts.checkin = [...history, { entry: { energyLevel: draft().energyLevel, sleepQuality: draft().sleepQuality, symptoms: { ...draft().symptoms }, stoolEvents: JSON.parse(JSON.stringify(draft().stoolEvents)), notes: draft().notes, health: draft().health }, submittedAt: new Date().toISOString() }];
+  const previousDirtySections = [...(day.dirtySections || [])];
   day.dirtySections = (day.dirtySections || []).filter((section) => section !== 'checkin');
-  saveData(); updateStatus(); toast(`Check-in saved for ${activeDate}.`);
+  recordSubmissionAction(activeDate, 'section', 'checkin', { part: previous, draft: draftBefore, dirtySections: previousDirtySections }, { part: day.parts.checkin, draft: day.draft, dirtySections: day.dirtySections }, draftBefore);
+  saveData(); updateStatus(); updateSubmissionHistoryButtons(); toast(`Check-in saved for ${activeDate}.`);
 }
 
 function renameRoutineItem(itemId) {
@@ -845,7 +927,7 @@ function importAppleHealth(file) {
   reader.readAsText(file);
 }
 
-function saveDraft(section = 'checkin') { const day = getDay(); day.draft = draft(); day.dirtySections ||= []; if (!day.dirtySections.includes(section)) day.dirtySections.push(section); day.dirty = true; updateStatus(); }
+function saveDraft(section = 'checkin') { const day = getDay(); if ((day.submissionCursor ?? day.submissionActions?.length ?? 0) < (day.submissionActions?.length || 0)) { day.submissionActions = day.submissionActions.slice(0, day.submissionCursor); } day.draft = draft(); day.dirtySections ||= []; if (!day.dirtySections.includes(section)) day.dirtySections.push(section); day.dirty = true; updateStatus(); updateSubmissionHistoryButtons(); }
 function updateStatus() {
   const day = getDay();
   const dirty = day.dirtySections?.length;
@@ -862,16 +944,18 @@ function setDate(date) {
   document.getElementById('entryDate').value = activeDate;
   document.getElementById('quickUpdate').value = '';
   document.getElementById('quickUpdateStatus').textContent = 'Interpreted on this device. Review the updated fields before Submit.';
-  bindDraftFields(); renderRoutine(); renderSymptoms(); renderStoolEvents(); renderHealthSummary(); updateStatus();
+  bindDraftFields(); renderRoutine(); renderSymptoms(); renderStoolEvents(); renderHealthSummary(); updateStatus(); updateSubmissionHistoryButtons();
 }
 
 function submitDay() {
   const day = getDay();
+  const before = { submitted: JSON.parse(JSON.stringify(day.submitted ?? null)), draft: JSON.parse(JSON.stringify(day.draft)), dirtySections: [...(day.dirtySections || [])], submissionHistory: JSON.parse(JSON.stringify(day.submissionHistory || [])) };
   day.submissionHistory ||= [];
   if (day.submitted) day.submissionHistory.push(day.submitted);
   day.submitted = { ...JSON.parse(JSON.stringify(day.draft)), submittedAt: new Date().toISOString() };
   day.dirtySections = []; day.dirty = false;
-  saveData(); updateStatus(); renderMomentum(); renderLocalCorrelations(); toast('Day submitted. It now counts in your record.');
+  recordSubmissionAction(activeDate, 'day', '', before, { submitted: JSON.parse(JSON.stringify(day.submitted)), draft: JSON.parse(JSON.stringify(day.draft)), dirtySections: [], submissionHistory: JSON.parse(JSON.stringify(day.submissionHistory || [])) }, before.draft);
+  saveData(); updateStatus(); updateSubmissionHistoryButtons(); renderMomentum(); renderLocalCorrelations(); toast('Day submitted. It now counts in your record.');
   openChallenge();
 }
 
@@ -1938,6 +2022,10 @@ document.getElementById('confirmQuickUpdate').addEventListener('click', confirmQ
 document.getElementById('cancelQuickUpdate').addEventListener('click', cancelQuickUpdate);
 document.getElementById('healthImport').addEventListener('change', (event) => importAppleHealth(event.target.files[0]));
 document.getElementById('submitDay').addEventListener('click', submitDay);
+document.getElementById('undoSubmission').addEventListener('click', undoSubmission);
+document.getElementById('redoSubmission').addEventListener('click', redoSubmission);
+document.getElementById('undoSubmissionDialog').addEventListener('click', undoSubmission);
+document.getElementById('redoSubmissionDialog').addEventListener('click', redoSubmission);
 document.getElementById('closeChallenge').addEventListener('click', () => document.getElementById('momentumDialog').close());
 document.getElementById('momentumDialog').addEventListener('click', (event) => { if (event.target === event.currentTarget) event.currentTarget.close(); });
 document.getElementById('closeWisdom').addEventListener('click', () => { const overlay = document.getElementById('wisdomOverlay'); overlay.hidden = true; overlay.classList.remove('wisdom-show'); document.getElementById('resetPuzzle').focus(); });
