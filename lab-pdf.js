@@ -11,6 +11,7 @@ const KNOWN_MARKERS = [
   ['Thyroglobulin antibodies', /\b(?:thyroglobulin\s+(?:ab|antibodies)|tg\s*(?:ab|antibodies?))\b/i],
   ['25-OH Vitamin D', /\b25\s*-?\s*oh\s+vitamin\s*d\b|\bvitamin\s*d\s*,?\s*25\s*-?\s*hydroxy\b|\b25\s*-?\s*hydroxy\s+vitamin\s*d\b/i],
   ['Thyroid-stimulating immunoglobulin', /\b(?:thyroid\s+stimulating\s+immunoglobulin|tsi)\b/i],
+  ['TSH receptor antibodies (TRAb)', /\b(?:tsh\s*[- ]\s*r\s*[- ]?ab|tsh[- ]?rab)\b/i],
   ['TSH receptor antibodies', /\b(?:tsh\s+receptor\s+(?:ab|antibodies)|trab)\b/i],
   ['TSH', /\b(?:tsh|thyroid\s+stimulating\s+hormone|thyrotropin)\b/i],
   ['TRAb', /\btrab\b/i],
@@ -102,7 +103,9 @@ export function canonicalLabMarker(marker) {
 }
 
 export function labMarkerIdentity(marker) {
-  return normalizeMarkerText(canonicalLabMarker(marker));
+  const canonical = canonicalLabMarker(marker);
+  const normalized = normalizeMarkerText(canonical);
+  return /(?:calculated free testosterone \(cft\) %|bioavailable testosterone %)$/i.test(canonical) ? `${normalized} percent` : normalized;
 }
 
 const LAB_UNITS = /^(?:%|units?|u?m?iu\/(?:l|ml)|µiu\/(?:l|ml)|μiu\/(?:l|ml)|mu\/l|ng\/(?:dl|ml|l)|u?g\/(?:dl|ml|l)|pg\/(?:ml|l)|pmol\/l|nmol\/l|mmol\/l|u?mol\/l|µmol\/l|μmol\/l|mg\/(?:dl|l)|g\/(?:dl|l)|u\/l|iu\/l|ml\/min(?:\/\d+(?:\.\d+)?)?|cells?\/(?:ul|µl|μl)|k\/ul|fl|pg|seconds?|sec|minutes?|min|ratio|index|copies\/ml|10\^?\d+\/(?:l|ul))$/i;

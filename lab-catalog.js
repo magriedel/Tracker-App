@@ -8,15 +8,20 @@ export const DEFAULT_LAB_CATEGORIES = [
     marker('Total T4', 'µg/dL', '4.5–12.0', ['T4 total', 'total thyroxine', 'thyroxine total', 'tiroxina total'], null, [['ug/dL', 1], ['nmol/L', 1 / 12.87]]),
     marker('T3 uptake', '%', '24–39', ['T3 resin uptake', 'T3RU', 'captacion de T3', 'captación de T3'], null, [['ratio', 100], ['fraction', 100]]),
     marker('Free thyroxine index', 'index', '1.2–4.9', ['FTI', 'T7', 'free T4 index', 'indice de tiroxina libre', 'índice de tiroxina libre']),
-    marker('Thyroid peroxidase antibodies (TPOAb)', 'IU/mL', 'Assay-specific; use report interval', ['TPOAb', 'TPO antibody', 'anti-TPO', 'thyroid peroxidase antibodies', 'anticuerpos antiperoxidasa', 'anticuerpos anti-TPO', 'anticuerpos contra la peroxidasa tiroidea'], null, [['kIU/L', 1], ['IU/L', 0.001]]),
+    marker('Thyroid peroxidase antibodies (TPOAb)', 'IU/mL', 'Assay-specific; use report interval', ['TPOAb', 'TPO antibody', 'anti-TPO', 'thyroid peroxidase antibodies', 'anticuerpos antiperoxidasa', 'anticuerpos anti-TPO', 'anticuerpos contra la peroxidasa tiroidea', 'anticuerpos antimicrosomales peroxidasa AntiTPO', 'anticuerpos antimicrosomales peroxidasa', 'AntiTPO'], null, [['kIU/L', 1], ['IU/L', 0.001]]),
     marker('Thyroglobulin antibodies (TgAb)', 'IU/mL', 'Assay-specific; use report interval', ['TgAb', 'thyroglobulin antibody', 'anti-thyroglobulin', 'anticuerpos antitiroglobulina', 'anticuerpos anti-tiroglobulina'], null, [['kIU/L', 1], ['IU/L', 0.001]]),
-    marker('TSH receptor antibodies (TRAb)', 'IU/L', 'Assay-specific; use report interval', ['TRAb', 'TSH receptor antibody', 'thyrotropin receptor antibodies', 'anticuerpos del receptor de TSH', 'anticuerpos anti-receptor de TSH'], null, [['IU/mL', 1000], ['kIU/L', 1]]),
+    marker('TSH receptor antibodies (TRAb)', 'IU/L', 'Assay-specific; use report interval', ['TRAb', 'TSH receptor antibody', 'TSH receptor ab', 'TSH-RAb', 'TSH - RAb', 'TSH-R Ab', 'thyrotropin receptor antibodies', 'anticuerpos del receptor de TSH', 'anticuerpos anti-receptor de TSH'], null, [['IU/mL', 1000], ['kIU/L', 1]]),
     marker('Thyroid stimulating immunoglobulin (TSI)', 'index', 'Assay-specific; use report interval', ['TSI', 'thyroid-stimulating immunoglobulin', 'inmunoglobulina estimulante tiroidea'])
   ]},
   { name: 'Other hormones', markers: [
     marker('Total testosterone', 'ng/dL', '', ['testosterone', 'testosterona total', 'testosterona'], { female: '15–70 (adult typical)', male: '264–916 (adult typical)' }, [['nmol/L', 28.84]]),
     marker('DHEA sulfate (DHEA-S)', 'µg/dL', 'Age- and sex-specific; use report interval', ['DHEA-S', 'DHEAS', 'dehydroepiandrosterone sulfate', 'sulfato de DHEA'], null, [['umol/L', 36.85], ['µmol/L', 36.85]]),
-    marker('Sex hormone binding globulin (SHBG)', 'nmol/L', 'Age- and sex-specific; use report interval', ['SHBG', 'sex hormone-binding globulin', 'globulina fijadora de hormonas sexuales'])
+    marker('Sex hormone binding globulin (SHBG)', 'nmol/L', 'Age- and sex-specific; use report interval', ['SHBG', 'sex hormone-binding globulin', 'globulina fijadora de hormonas sexuales', 'SHBG globulina transportadora de hormonas sexuales', 'SHBG globulina transp de hormonas sexuales', 'globulina transp de hormonas sexuales', 'globulina transportadora de hormonas sexuales']),
+    marker('Free androgen index', '%', 'Use laboratory-specific reference interval', ['FAI', 'free androgen index', 'indice androgenico libre', 'índice androgénico libre']),
+    marker('Calculated free testosterone (CFT) %', '%', 'Use laboratory-specific reference interval', ['testosterona libre calculada CFT porcentaje', 'testosterona libre calculada CFT %', 'calculated free testosterone percentage', 'CFT percentage']),
+    marker('Calculated free testosterone (CFT)', 'pg/mL', 'Use laboratory-specific reference interval', ['CFT', 'calculated free testosterone', 'testosterona libre calculada', 'testosterona libre calculada CFT'], null, [['pmol/L', 1 / 3.467]]),
+    marker('Bioavailable testosterone', 'ng/dL', 'Use laboratory-specific reference interval', ['bioavailable testosterone', 'testosterona biodisponible'], { female: 'Use laboratory-specific reference interval', male: 'Use laboratory-specific reference interval' }, [['nmol/L', 28.84]]),
+    marker('Bioavailable testosterone %', '%', 'Use laboratory-specific reference interval', ['bioavailable testosterone percentage', 'testosterona biodisponible porcentaje', 'testosterona biodisponible %'])
   ]},
   { name: 'Blood count', markers: [
     marker('Hemoglobin', 'g/dL', '', ['haemoglobin', 'hemoglobina'], { female: '12.0–15.5 (adult typical)', male: '13.5–17.5 (adult typical)' }, [['g/L', 0.1]]),
@@ -52,7 +57,7 @@ export const DEFAULT_LAB_CATEGORIES = [
   ]},
   { name: 'Glucose metabolism', markers: [
     marker('Glucose', 'mg/dL', '70–99 fasting', ['glucosa'], null, [['mmol/L', 18.0182]]),
-    marker('Hemoglobin A1c (HbA1c)', '%', '<5.7 (non-diabetic)', ['HbA1c', 'A1c', 'glycated hemoglobin', 'hemoglobina glicosilada'], null, [['mmol/mol', 0.09148, 2.152]]),
+    marker('Hemoglobin A1c (HbA1c)', '%', '<5.7 (non-diabetic)', ['HbA1c', 'A1c', 'glycated hemoglobin', 'hemoglobina glicosilada', 'hemoglobina glicada', 'hemoglobina glicada hba1c'], null, [['mmol/mol', 0.09148, 2.152]]),
     marker('Estimated average glucose', 'mg/dL', 'Derived from HbA1c', ['eAG', 'average glucose', 'glucosa promedio'], null, [['mmol/L', 18.0182]])
   ]},
   { name: 'Kidney function and uric acid', markers: [
@@ -79,7 +84,7 @@ export const DEFAULT_LAB_CATEGORIES = [
     marker('Bilirubin (direct)', 'mg/dL', '0.0–0.3', ['direct bilirubin', 'conjugated bilirubin', 'bilirrubina directa'], null, [['µmol/L', 1 / 17.1], ['umol/L', 1 / 17.1]]),
     marker('Bilirubin (indirect)', 'mg/dL', '0.1–0.9', ['indirect bilirubin', 'unconjugated bilirubin', 'bilirrubina indirecta'], null, [['µmol/L', 1 / 17.1], ['umol/L', 1 / 17.1]]),
     marker('Total protein', 'g/dL', '6.0–8.3', ['protein total', 'proteina total', 'proteína total'], null, [['g/L', 0.1]]),
-    marker('Albumin', 'g/dL', '3.5–5.0', ['albumina'], null, [['g/L', 0.1]]),
+    marker('Albumin', 'g/dL', '3.5–5.0', ['albumina', 'albumina en suero', 'albúmina en suero'], null, [['g/L', 0.1]]),
     marker('Globulin', 'g/dL', '2.0–3.5', ['globulina'], null, [['g/L', 0.1]]),
     marker('Albumin/globulin ratio', 'ratio', '1.0–2.2', ['A/G ratio', 'albumin globulin ratio', 'relacion albumina globulina'])
   ]},
@@ -131,11 +136,18 @@ const definitionMap = new Map(DEFAULT_LAB_CATEGORIES.flatMap((category) => categ
 
 export function canonicalCatalogMarker(value) {
   const original = String(value ?? '').trim();
+  if (/testosterona\s+libre\s+calculada.*%/i.test(original) || /calculated\s+free\s+testosterone.*%/i.test(original)) return 'Calculated free testosterone (CFT) %';
+  if (/testosterona\s+biodisponible.*%/i.test(original) || /bioavailable\s+testosterone.*%/i.test(original)) return 'Bioavailable testosterone %';
+  if (/^testosterona\s+biodisponible$/i.test(normalize(original)) || /^bioavailable\s+testosterone$/i.test(normalize(original))) return 'Bioavailable testosterone';
   return aliasMap.get(normalize(original)) || original;
 }
 
 export function catalogMarkerDefinition(value) {
-  return definitionMap.get(normalize(canonicalCatalogMarker(value))) || null;
+  const canonical = canonicalCatalogMarker(value);
+  if (['Calculated free testosterone (CFT) %', 'Calculated free testosterone (CFT)', 'Bioavailable testosterone %', 'Bioavailable testosterone'].includes(canonical)) {
+    return DEFAULT_LAB_CATEGORIES.flatMap((category) => category.markers).find((item) => item.name === canonical) || null;
+  }
+  return definitionMap.get(normalize(canonical)) || null;
 }
 
 export function catalogCategoryForMarker(value) {
