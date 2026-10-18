@@ -19,7 +19,7 @@
     <link rel="stylesheet" href="./routine-management.css?v=4" />
     <link rel="stylesheet" href="./analysis.css?v=1" />
     <link rel="stylesheet" href="./routine-edit.css?v=7" />
-    <link rel="stylesheet" href="./lab-pdf.css?v=24" />
+    <link rel="stylesheet" href="./lab-pdf.css?v=25" />
     <link rel="stylesheet" href="./folders.css?v=1" />
     <title>Thyroid Tracker</title>
   </head>
@@ -65,8 +65,8 @@
 
         <section class="screen" id="screen-labs" role="tabpanel" aria-labelledby="tab-labs" hidden>
           <div class="screen-heading compact-heading"><h2>Labs</h2><button id="exportCsvBtn" class="button secondary small" type="button">Export CSV</button></div>
-          <details class="lab-profile-tools"><summary>Age and reference profile</summary><p>Typical intervals may vary by laboratory and assay. The interval printed on your report takes precedence. The gender selection is used only where reference intervals are sex-specific.</p><form id="labProfileForm" class="lab-profile-form"><label class="field"><span>Age in years</span><input id="labProfileAge" type="number" min="0" max="120" step="1" placeholder="Optional" /></label><label class="field"><span>Gender for reference intervals</span><select id="labProfileSex"><option value="">Not specified</option><option value="female">Female</option><option value="male">Male</option><option value="other">Another / prefer not to say</option></select></label><button class="button secondary" type="submit">Save profile</button></form></details>
-          <section class="lab-catalog" aria-label="Biomarker categories"><div class="lab-category-heading"><h3>Biomarkers</h3><button id="addLabCategory" class="button secondary small" type="button">＋ Category</button></div><nav id="labCategoryTabs" class="lab-category-tabs" aria-label="Biomarker categories" role="tablist"></nav><div class="lab-category-actions"><button id="renameLabCategory" class="text-button" type="button">Rename category</button><button id="moveLabCategoryLeft" class="text-button" type="button" aria-label="Move category earlier">← Earlier</button><button id="moveLabCategoryRight" class="text-button" type="button" aria-label="Move category later">Later →</button><button id="deleteLabCategory" class="text-button danger" type="button">Delete category</button></div><form id="addLabMarkerForm" class="lab-add-marker-form"><label class="field"><span>New biomarker in this category</span><input id="newLabMarker" maxlength="100" placeholder="Biomarker name" required /></label><button class="button secondary" type="submit">＋ Add biomarker</button></form><div id="labCategoryMarkers" class="lab-category-markers"></div></section>
+          <details class="lab-profile-tools"><summary>Age and gender</summary><form id="labProfileForm" class="lab-profile-form"><label class="field"><span>Age</span><input id="labProfileAge" type="number" min="0" max="120" step="1" placeholder="Years" /></label><label class="field"><span>Gender for reference intervals</span><select id="labProfileSex"><option value="">Not specified</option><option value="female">Female</option><option value="male">Male</option><option value="other">Other / prefer not to say</option></select></label><button class="button secondary" type="submit">Save</button></form></details>
+          <nav id="labCategoryTabs" class="lab-category-tabs" aria-label="Biomarker categories" role="tablist"></nav>
           <div class="lab-toolbar"><div class="lab-entry-actions"><details class="lab-entry-details"><summary>＋ Add lab result</summary><form id="labForm" class="lab-form">
             <label class="field"><span>Marker</span><input id="labMarker" list="markerOptions" required placeholder="e.g. TSH" /><datalist id="markerOptions"><option>TSH</option><option>Free T4</option><option>Free T3</option><option>TRAb</option><option>TSI</option></datalist></label>
             <label class="field"><span>Result date</span><input id="labDate" type="date" required /></label>
@@ -76,7 +76,6 @@
             <label class="field"><span>Desired low</span><input id="labDesiredLow" type="number" step="any" placeholder="Optional" /></label><label class="field"><span>Desired high</span><input id="labDesiredHigh" type="number" step="any" placeholder="Optional" /></label>
             <button class="button primary" type="submit">Add result</button>
           </form></details><label class="button secondary lab-import-button" for="labImport">Import PDF / CSV</label><input id="labImport" type="file" accept=".pdf,application/pdf,.csv,.txt,text/csv,text/plain" hidden /></div><label class="field compact-field lab-timeframe"><span>Show timeframe</span><select id="labTimeFilter"><option value="all">All results</option><option value="90">Last 90 days</option><option value="365">Last year</option><option value="1825">Last 5 years</option></select></label></div><p id="labImportStatus" class="fine-print" role="status" hidden></p>
-          <details class="lab-merge-tools" id="labMergeTools" hidden><summary>Combine duplicate markers</summary><p>Use only for the same test with different names, such as English and Spanish. Every dated result is kept; do not combine different tests such as Free T4 and Total T4.</p><form id="labMergeForm" class="lab-merge-form"><label class="field"><span>Combine this marker</span><select id="labMergeSource" required></select></label><label class="field"><span>Into this marker</span><select id="labMergeTarget" required></select></label><button class="button secondary" type="submit">Combine markers</button></form></details>
           <div id="labDashboard" class="lab-dashboard"></div>
         </section>
 
@@ -107,7 +106,7 @@
       <dialog id="routineGroupMenu" class="routine-group-menu"><div class="dialog-heading"><div><p class="eyebrow">Routine tab</p><h2 id="routineGroupMenuTitle">Time of day</h2></div><button id="closeRoutineGroupMenu" class="icon-button" type="button" aria-label="Close tab menu">Done</button></div><div class="routine-group-menu-actions"><button id="renameRoutineGroup" class="button secondary" type="button">Rename tab</button><button id="deleteRoutineGroup" class="button danger-button" type="button">Delete tab</button></div></dialog>
       <div id="toast" class="toast" role="status" aria-live="polite"></div>
     </div>
-    <script type="module" src="./tracker.js?v=27"></script>
+    <script type="module" src="./tracker.js?v=28"></script>
     <script type="module" src="./folders.js?v=1"></script>
   </body>
 </html>

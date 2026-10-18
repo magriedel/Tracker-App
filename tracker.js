@@ -951,26 +951,9 @@ function ensureCatalogMarker(markerName, categoryHint = activeLabCategory) {
 
 function renderLabCatalog() {
   const categories = labCategories();
-  let changed = false;
-  groupLabs().forEach((entries) => {
-    const name = canonicalUserLabMarker(entries[0].marker);
-    if (!data.hiddenLabMarkers[markerReferenceKey(name)] && !categories.some((category) => categoryMarker(category, name))) { ensureCatalogMarker(name); changed = true; }
-  });
-  if (changed) saveData();
   if (!categories.some((category) => category.name === activeLabCategory)) activeLabCategory = categories[0]?.name || '';
   document.getElementById('markerOptions').innerHTML = categories.flatMap((category) => category.markers).map((name) => `<option value="${escapeHtml(name)}"></option>`).join('');
-  const counts = new Map(groupLabs().map((entries) => [markerReferenceKey(entries[0].marker), entries.length]));
-  document.getElementById('labCategoryTabs').innerHTML = categories.map((category) => `<button class="lab-category-tab ${category.name === activeLabCategory ? 'active' : ''}" type="button" role="tab" aria-selected="${category.name === activeLabCategory}" data-lab-category="${escapeHtml(category.name)}">${escapeHtml(category.name)}<small>${category.markers.length}</small></button>`).join('');
-  const active = categories.find((category) => category.name === activeLabCategory);
-  const categoryNames = categories.filter((category) => category.name !== activeLabCategory).map((category) => `<option value="${escapeHtml(category.name)}">${escapeHtml(category.name)}</option>`).join('');
-  document.getElementById('labCategoryMarkers').innerHTML = active?.markers.length ? active.markers.map((name) => {
-    const key = markerReferenceKey(name);
-    const itemCount = counts.get(key) || 0;
-    const baseName = baseCatalogMarker(name);
-    const reference = demographicReference(baseName, data.labProfile) || 'Use report interval';
-    const units = catalogMarkerDefinition(baseName)?.units;
-    return `<div class="lab-catalog-marker"><div class="lab-catalog-marker-copy"><strong>${escapeHtml(name)}</strong><small>${itemCount} ${itemCount === 1 ? 'result' : 'results'} · ${escapeHtml(units ? `Common unit: ${units} · ` : '')}${escapeHtml(reference)}</small></div><button class="text-button" type="button" data-rename-lab-marker="${escapeHtml(key)}">Edit</button><select data-move-lab-marker="${escapeHtml(key)}" aria-label="Move ${escapeHtml(name)} to another category"><option value="" selected disabled>Move to…</option>${categoryNames}</select><button class="text-button danger" type="button" data-delete-lab-marker="${escapeHtml(key)}">Delete</button></div>`;
-  }).join('') : '<div class="empty-state">No biomarkers in this category yet. Add one below.</div>';
+  document.getElementById('labCategoryTabs').innerHTML = categories.map((category) => `<button class="lab-category-tab ${category.name === activeLabCategory ? 'active' : ''}" type="button" role="tab" aria-selected="${category.name === activeLabCategory}" data-lab-category="${escapeHtml(category.name)}">${escapeHtml(category.name)}</button>`).join('');
 }
 
 function addLabCategory() {
@@ -1131,19 +1114,25 @@ function labRangeState(lab, range) {
 
 function renderLabs() {
   const el = document.getElementById('labDashboard');
-  renderLabMergeOptions();
   renderLabCatalog();
-  const groups = groupLabs().map((entries) => withinTimeframe(entries, document.getElementById('labTimeFilter').value)).filter((entries) => entries.length);
-  if (!groups.length) { el.innerHTML = '<div class="empty-state">No results in this time period. Try a wider filter or add a result.</div>'; return; }
+  const allGroups = groupLabs();
+  const allEntries = allGroups.flatMap((entries) => entries);
+  const groups = allGroups.map((entries) => withinTimeframe(entries, document.getElementById('labTimeFilter').value)).filter((entries) => entries.length);
   const dates = [...new Set(groups.flatMap((entries) => entries.map((lab) => lab.date)))].sort((a, b) => b.localeCompare(a));
   const portrait = window.matchMedia('(max-width:560px) and (orientation:portrait)').matches;
-  const bodyRows = groups.map((entries) => {
+  const activeCategory = labCategories().find((category) => category.name === activeLabCategory);
+  const selectedMarkers = activeCategory?.markers || [];
+  const bodyRows = selectedMarkers.map((catalogMarker) => {
+    const key = markerReferenceKey(catalogMarker);
+    const entries = groups.find((group) => markerReferenceKey(group[0].marker) === key) || [];
+    const historicalEntries = allEntries.filter((lab) => markerReferenceKey(lab.marker) === key);
     const newestFirst = entries.slice().reverse();
-    const marker = canonicalUserLabMarker(entries[0].marker);
+    const marker = canonicalUserLabMarker(historicalEntries[0]?.marker || catalogMarker);
     const range = markerRange(marker);
-    const units = [...new Set(entries.map((lab) => lab.units).filter(Boolean))];
-    const unitLabel = units.length > 1 ? 'Varies' : units[0] || '—';
-    const reference = markerReference(marker) || entries.find((lab) => lab.reference)?.reference || '—';
+    const units = [...new Set(historicalEntries.map((lab) => lab.units).filter(Boolean))];
+    const standardUnits = catalogMarkerDefinition(baseCatalogMarker(marker))?.units || '';
+    const unitLabel = standardUnits || (units.length > 1 ? 'Varies' : units[0] || '—');
+    const reference = savedMarkerReference(marker) || demographicReference(baseCatalogMarker(marker), data.labProfile) || catalogMarkerDefinition(baseCatalogMarker(marker))?.reference || '—';
     const cells = dates.map((date) => {
       const results = newestFirst.filter((lab) => lab.date === date);
       const dateClass = 'lab-date-column';
@@ -1577,27 +1566,11 @@ document.getElementById('labProfileForm').addEventListener('submit', (event) => 
   data.labProfile = { age: ageValue === '' ? '' : Number(ageValue), sex: document.getElementById('labProfileSex').value };
   saveData(); renderLabs(); toast('Reference profile saved on this device.');
 });
-document.getElementById('labCategoryTabs').addEventListener('click', handleLabCatalogClick);
-document.getElementById('labCategoryMarkers').addEventListener('click', handleLabCatalogClick);
-document.getElementById('labCategoryMarkers').addEventListener('change', handleLabCatalogMove);
-document.getElementById('addLabCategory').addEventListener('click', addLabCategory);
-document.getElementById('renameLabCategory').addEventListener('click', renameLabCategory);
-document.getElementById('moveLabCategoryLeft').addEventListener('click', () => moveLabCategory(-1));
-document.getElementById('moveLabCategoryRight').addEventListener('click', () => moveLabCategory(1));
-document.getElementById('deleteLabCategory').addEventListener('click', deleteLabCategory);
-document.getElementById('addLabMarkerForm').addEventListener('submit', addLabCatalogMarker);
-document.getElementById('labMergeForm').addEventListener('submit', (event) => {
-  event.preventDefault();
-  const sourceKey = document.getElementById('labMergeSource').value;
-  const targetKey = document.getElementById('labMergeTarget').value;
-  if (!sourceKey || !targetKey || sourceKey === targetKey) { toast('Choose two different markers to combine.'); return; }
-  const source = data.labs.find((lab) => markerReferenceKey(lab.marker) === sourceKey);
-  const target = data.labs.find((lab) => markerReferenceKey(lab.marker) === targetKey);
-  if (!source || !target) return;
-  const sourceName = canonicalUserLabMarker(source.marker);
-  const targetName = canonicalUserLabMarker(target.marker);
-  if (!confirm(`Combine ${sourceName} into ${targetName}? All dated results will be kept.`)) return;
-  if (mergeLabMarkers(sourceKey, targetKey)) toast(`Results combined under ${targetName}.`);
+document.getElementById('labCategoryTabs').addEventListener('click', (event) => {
+  const tab = event.target.closest('[data-lab-category]');
+  if (!tab || tab.dataset.labCategory === activeLabCategory) return;
+  activeLabCategory = tab.dataset.labCategory;
+  renderLabs();
 });
 document.getElementById('labImport').addEventListener('change', (event) => { importLabs(event.target.files[0]); event.target.value = ''; });
 document.getElementById('confirmLabPdfImport').addEventListener('click', confirmLabPdfImport);
