@@ -1,3 +1,5 @@
+import { canonicalCatalogMarker, catalogMarkerDefinition } from './lab-catalog.js';
+
 const DATE_PATTERN = /\b(20\d{2}[-/.]\d{1,2}[-/.]\d{1,2}|\d{1,2}[-/.]\d{1,2}[-/.]\d{2,4})\b/;
 const NUMBER_PATTERN = /[<>]?\s*-?\d+(?:[.,]\d+)?/g;
 const KNOWN_MARKERS = [
@@ -80,7 +82,7 @@ const BIOMARKER_PATTERNS = [
 export function isBiomarkerName(marker) {
   const normalized = normalizeMarkerText(marker).replace(/\s+\d{2}$/, '');
   if (!normalized || /^(?:name|age|sex|gender|dob|date|page|patient|specimen|accession|reference|result|test)$/.test(normalized)) return false;
-  if (MARKER_ALIAS_MAP.has(normalized)) return true;
+  if (MARKER_ALIAS_MAP.has(normalized) || catalogMarkerDefinition(marker)) return true;
   return BIOMARKER_PATTERNS.some((pattern) => pattern.test(normalized));
 }
 
@@ -96,7 +98,7 @@ function isStructuredLabMarker(marker) {
 
 export function canonicalLabMarker(marker) {
   const original = String(marker ?? '').trim();
-  return MARKER_ALIAS_MAP.get(normalizeMarkerText(original)) || original;
+  return canonicalCatalogMarker(MARKER_ALIAS_MAP.get(normalizeMarkerText(original)) || original);
 }
 
 export function labMarkerIdentity(marker) {
