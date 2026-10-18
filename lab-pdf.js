@@ -89,12 +89,12 @@ export function isBiomarkerName(marker) {
 
 function isExcludedReportLabel(marker) {
   const normalized = normalizeMarkerText(marker).replace(/\s+\d{2}$/, '');
-  return /^(?:name|patient(?: name| id| number)?|age|sex|gender|dob|date(?: of birth| collected| of service)?|page(?: \d+)?|reference(?: interval| range)?|test(?: name)?|result(?: flag)?|specimen(?: id| type)?|accession(?: number)?|order(?: number)?|account(?: number)?|report(?: date| number)?|labcorp|diagnosis)(?:\b|$)/.test(normalized);
+  return /^(?:name|patient(?: name| id| number| identifier)?|patient id|patient identifier|id paciente|identificacion(?: del paciente)?|identificación(?: del paciente)?|age|edad|sex|sexo|gender|genero|género|dob|date of birth|fecha de nacimiento|birth(?: date)?|date(?: of birth| collected| of service)?|fecha(?: de (?:nacimiento|toma|recoleccion|extraccion|servicio))?|page(?: \d+)?|reference(?: interval| range)?|rango de referencia|intervalo de referencia|reference values?|valores de referencia|test(?: name)?|result(?: flag)?|specimen(?: id| type)?|accession(?: number)?|order(?: number)?|account(?: number)?|report(?: date| number)?|labcorp|diagnosis|women|men|female|male|mujeres|hombres|trimester|trimestre)(?:\b|$)/.test(normalized);
 }
 
 function isStructuredLabMarker(marker) {
   const normalized = normalizeMarkerText(marker).replace(/\s+\d{2}$/, '');
-  return Boolean(normalized && normalized.length <= 80 && /[a-z]/.test(normalized) && !isExcludedReportLabel(normalized));
+  return Boolean(normalized && normalized.length <= 80 && /[a-z]/.test(normalized) && !isExcludedReportLabel(normalized) && isBiomarkerName(normalized));
 }
 
 export function canonicalLabMarker(marker) {
@@ -313,18 +313,19 @@ export function parseLabLines(rawLines, filenameDate = '') {
   for (const line of labeledDateLines) { const match = line.match(DATE_PATTERN); if (match) { reportDate = normalizeDate(match[1]); if (reportDate) break; } }
   const rows = [];
   const seen = new Set();
-  let orphan = null;
+  let pendingMarker = null;
   for (const line of lines) {
     const orphanMatch = parseOrphanLabcorpResult(line);
-    if (orphanMatch) { orphan = orphanMatch; continue; }
-    if (orphan && isMarkerOnlyLine(line)) {
-      for (const row of rowsFromOrphan(line, orphan, reportDate)) {
+    if (pendingMarker && orphanMatch) {
+      for (const row of rowsFromOrphan(pendingMarker, orphanMatch, reportDate)) {
         const key = [row.marker.toLowerCase(), row.date, row.value, row.units.toLowerCase()].join('|');
         if (!seen.has(key)) { seen.add(key); rows.push(row); }
       }
-      orphan = null;
+      pendingMarker = null;
       continue;
     }
+    if (isMarkerOnlyLine(line)) { pendingMarker = line; continue; }
+    pendingMarker = null;
     if (/^.+\s+\d{2}$/.test(line) && isBiomarkerName(line.replace(/\s+\d{2}$/, ''))) continue;
     const dated = parseDatedLabcorpLine(line, reportDate);
     if (dated) {
