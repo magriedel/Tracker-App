@@ -1,0 +1,26 @@
+.date-picker-trigger{box-sizing:border-box;width:112px;max-width:112px;min-width:0;height:30px;min-height:30px;margin:0;padding:0 8px;border:1px solid var(--line);border-radius:7px;background:var(--white);color:var(--ink);font-size:.74rem;line-height:1;text-align:left;white-space:nowrap}
+.date-picker-trigger:hover{border-color:#9aafa1;background:#f8faf8}
+.date-picker-dialog{width:min(350px,calc(100vw - 24px));max-width:none;max-height:calc(100dvh - 24px);margin:auto;padding:15px;border:1px solid var(--line);border-radius:10px;background:var(--white);color:var(--ink);box-shadow:0 18px 50px #1825222b}
+.date-picker-dialog::backdrop{background:#18252266}
+.date-picker-heading,.date-picker-controls,.date-picker-footer{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.date-picker-heading{margin-bottom:12px}
+.date-picker-heading h2{margin:0;font-size:1rem}
+.date-picker-heading .icon-button,.date-picker-controls .icon-button{min-width:34px;min-height:34px;padding:4px 8px}
+.date-picker-controls{margin-bottom:12px}
+.date-picker-controls strong{font-size:.93rem}
+.date-picker-weekdays,.date-picker-grid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:3px}
+.date-picker-weekdays{margin-bottom:4px;color:var(--muted);font-size:.67rem;text-align:center}
+.date-picker-weekdays span{padding:4px 0}
+.date-picker-day{position:relative;display:grid;place-items:center;aspect-ratio:1;min-width:0;padding:0 0 3px;border:1px solid transparent;border-radius:7px;background:transparent;color:var(--ink);font-size:.82rem}
+.date-picker-day:hover{background:#edf3ee}
+.date-picker-day.outside-month{color:#9aa49e}
+.date-picker-day.is-today{border-color:#8ca998;font-weight:700}
+.date-picker-day.is-selected{background:var(--green);color:white}
+.date-picker-day.is-selected:hover{background:var(--green-dark)}
+.date-picker-day.is-submitted::after,.submitted-day-dot{width:5px;height:5px;border-radius:50%;background:var(--green);content:""}
+.date-picker-day.is-submitted::after{position:absolute;bottom:3px;left:calc(50% - 2.5px)}
+.date-picker-day.is-selected.is-submitted::after{background:white}
+.date-picker-footer{margin-top:10px;padding-top:9px;border-top:1px solid var(--line);color:var(--muted);font-size:.75rem}
+.date-picker-footer>span{display:flex;align-items:center;gap:6px}
+.date-picker-footer .text-button{padding:5px 7px;color:var(--green-dark)}
+@media(max-width:480px){.date-picker-dialog{padding:12px}.date-picker-day{font-size:.8rem}}

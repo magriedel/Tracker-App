@@ -19,6 +19,7 @@
     <link rel="stylesheet" href="./routine-management.css?v=4" />
     <link rel="stylesheet" href="./analysis.css?v=2" />
     <link rel="stylesheet" href="./routine-edit.css?v=7" />
+    <link rel="stylesheet" href="./calendar.css?v=1" />
     <link rel="stylesheet" href="./lab-pdf.css?v=28" />
     <link rel="stylesheet" href="./folders.css?v=1" />
     <title>Thyroid Tracker</title>
@@ -27,8 +28,16 @@
     <div class="app-shell">
       <header class="topbar">
         <div class="brand-lockup"><span class="brand-mark" aria-hidden="true"><svg viewBox="0 0 512 512" width="100%" height="100%" style="display:block" focusable="false"><path d="M256 77c-25 54-117 119-117 219a117 117 0 0 0 234 0C373 196 281 131 256 77Z" fill="#d8e7dc"/><path d="M256 184v193M194 248h124" fill="none" stroke="#245e4d" stroke-linecap="round" stroke-width="25"/></svg></span><div><p class="eyebrow">Private health journal</p><h1>Thyroid Tracker</h1></div></div>
-        <div class="top-actions"><div class="date-export"><label class="date-control"><span>Day</span><input id="entryDate" type="date" /></label><button id="exportJsonBtn" class="icon-button" type="button" aria-label="Export submitted records" title="Export submitted records">Export</button></div><div class="submit-cluster"><button id="submitDay" class="button submit-button" type="button">Submit day</button><span id="submissionStatus">Today is not submitted</span><div class="submission-history-buttons"><button id="undoSubmission" class="icon-button" type="button" aria-label="Undo last submission" title="Undo last submission" disabled>↶</button><button id="redoSubmission" class="icon-button" type="button" aria-label="Redo submission" title="Redo submission" disabled>↷</button></div></div></div>
+        <div class="top-actions"><div class="date-export"><label class="date-control"><span>Day</span><button id="entryDate" class="date-picker-trigger" type="button" aria-haspopup="dialog" aria-controls="datePickerDialog" aria-expanded="false"></button></label><button id="exportJsonBtn" class="icon-button" type="button" aria-label="Export submitted records" title="Export submitted records">Export</button></div><div class="submit-cluster"><button id="submitDay" class="button submit-button" type="button">Submit day</button><span id="submissionStatus">Today is not submitted</span><div class="submission-history-buttons"><button id="undoSubmission" class="icon-button" type="button" aria-label="Undo last submission" title="Undo last submission" disabled>↶</button><button id="redoSubmission" class="icon-button" type="button" aria-label="Redo submission" title="Redo submission" disabled>↷</button></div></div></div>
       </header>
+
+      <dialog id="datePickerDialog" class="date-picker-dialog" aria-labelledby="datePickerHeading">
+        <div class="date-picker-heading"><h2 id="datePickerHeading">Choose a day</h2><button id="closeDatePicker" class="icon-button" type="button" aria-label="Close calendar">Done</button></div>
+        <div class="date-picker-controls"><button id="previousCalendarMonth" class="icon-button" type="button" aria-label="Previous month">‹</button><strong id="calendarMonthLabel"></strong><button id="nextCalendarMonth" class="icon-button" type="button" aria-label="Next month">›</button></div>
+        <div class="date-picker-weekdays" aria-hidden="true"><span>Sun</span><span>Mon</span><span>Tue</span><span>Wed</span><span>Thu</span><span>Fri</span><span>Sat</span></div>
+        <div id="datePickerGrid" class="date-picker-grid" role="group" aria-label="Calendar days"></div>
+        <div class="date-picker-footer"><span><i class="submitted-day-dot" aria-hidden="true"></i> Submitted</span><button id="calendarToday" class="text-button" type="button">Today</button></div>
+      </dialog>
 
       <section class="quick-capture" aria-label="Quick daily update"><textarea id="quickUpdate" rows="1" aria-label="Quick update" placeholder="What changed today?"></textarea><button id="quickVoiceButton" class="quick-mic" type="button" aria-label="Dictate quick update" title="Dictate quick update">🎙</button><button id="applyQuickUpdate" class="quick-review-button" type="button">Review</button><div id="quickUpdateReview" class="quick-update-review" hidden><p id="quickUpdateStatus" aria-live="polite"></p><button id="confirmQuickUpdate" class="button primary" type="button">Confirm changes</button><button id="cancelQuickUpdate" class="text-button" type="button">Cancel</button></div></section>
 
@@ -107,7 +116,7 @@
       <dialog id="labCategoryMenu" class="routine-group-menu"><div class="dialog-heading"><div><p class="eyebrow">Biomarker category</p><h2 id="labCategoryMenuTitle">Category</h2></div><button id="closeLabCategoryMenu" class="icon-button" type="button" aria-label="Close category menu">Done</button></div><div class="routine-group-menu-actions"><button id="renameLabCategory" class="button secondary" type="button">Rename category</button><button id="deleteLabCategory" class="button danger-button" type="button">Delete category</button></div></dialog>
       <div id="toast" class="toast" role="status" aria-live="polite"></div>
     </div>
-    <script type="module" src="./tracker.js?v=41"></script>
+    <script type="module" src="./tracker.js?v=42"></script>
     <script type="module" src="./folders.js?v=1"></script>
   </body>
 </html>

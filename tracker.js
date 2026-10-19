@@ -99,6 +99,7 @@ Object.entries(data.desiredRanges).forEach(([marker, range]) => {
 });
 migrateStoredLabUnits();
 let activeDate = today();
+let calendarMonth = new Date(`${activeDate}T12:00:00`);
 let recognition = null;
 let toastTimer;
 let selectedSquare = null;
@@ -937,13 +938,39 @@ function updateStatus() {
   document.getElementById('submissionStatus').textContent = dirty ? `${day.dirtySections.length} section${dirty === 1 ? '' : 's'} not submitted` : day.submitted ? 'Submitted' : partCount ? `${partCount} part${partCount === 1 ? '' : 's'} saved · day open` : activeDate === today() ? 'Today is not submitted' : 'No submission for this date';
   document.getElementById('submissionStatus').classList.toggle('submitted', Boolean(day.submitted && !dirty));
 }
+function formatCalendarDate(date) {
+  const [year, month, day] = date.split('-').map(Number);
+  return new Date(year, month - 1, day, 12).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: '2-digit' });
+}
+function renderDatePicker() {
+  const year = calendarMonth.getFullYear();
+  const month = calendarMonth.getMonth();
+  const firstDay = new Date(year, month, 1, 12);
+  const start = new Date(year, month, 1 - firstDay.getDay(), 12);
+  document.getElementById('calendarMonthLabel').textContent = firstDay.toLocaleDateString(undefined, { month: 'long', year: 'numeric' });
+  document.getElementById('datePickerGrid').innerHTML = Array.from({ length: 42 }, (_, index) => {
+    const date = new Date(start);
+    date.setDate(start.getDate() + index);
+    const key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+    const submitted = Boolean(data.days[key]?.submitted);
+    const classes = ['date-picker-day', date.getMonth() !== month ? 'outside-month' : '', key === today() ? 'is-today' : '', key === activeDate ? 'is-selected' : '', submitted ? 'is-submitted' : ''].filter(Boolean).join(' ');
+    const label = `${date.toLocaleDateString(undefined, { month: 'long', day: 'numeric', year: 'numeric' })}${submitted ? ', submitted' : ''}`;
+    return `<button class="${classes}" type="button" data-calendar-date="${key}" aria-label="${label}" aria-pressed="${key === activeDate}">${date.getDate()}</button>`;
+  }).join('');
+}
+function openDatePicker() {
+  calendarMonth = new Date(`${activeDate}T12:00:00`);
+  renderDatePicker();
+  document.getElementById('datePickerDialog').showModal();
+  document.getElementById('entryDate').setAttribute('aria-expanded', 'true');
+}
 function setDate(date) {
   if (pendingQuickUpdate) cancelQuickUpdate();
   activeRoutineGroup = routineGroups()[0];
   activeDate = date || today();
   getDay();
   if (data.healthByDate?.[activeDate]) draft().health = data.healthByDate[activeDate];
-  document.getElementById('entryDate').value = activeDate;
+  document.getElementById('entryDate').textContent = formatCalendarDate(activeDate);
   document.getElementById('quickUpdate').value = '';
   document.getElementById('quickUpdateStatus').textContent = 'Interpreted on this device. Review the updated fields before Submit.';
   bindDraftFields(); renderRoutine(); renderSymptoms(); renderStoolEvents(); renderHealthSummary(); updateStatus(); updateSubmissionHistoryButtons();
@@ -2081,7 +2108,18 @@ function setupTabs() {
   document.querySelectorAll('[data-screen]').forEach((button) => button.addEventListener('click', () => showScreen(button.dataset.screen)));
 }
 
-document.getElementById('entryDate').addEventListener('change', (event) => setDate(event.target.value));
+document.getElementById('entryDate').addEventListener('click', openDatePicker);
+document.getElementById('datePickerDialog').addEventListener('close', () => document.getElementById('entryDate').setAttribute('aria-expanded', 'false'));
+document.getElementById('closeDatePicker').addEventListener('click', () => document.getElementById('datePickerDialog').close());
+document.getElementById('previousCalendarMonth').addEventListener('click', () => { calendarMonth.setMonth(calendarMonth.getMonth() - 1); renderDatePicker(); });
+document.getElementById('nextCalendarMonth').addEventListener('click', () => { calendarMonth.setMonth(calendarMonth.getMonth() + 1); renderDatePicker(); });
+document.getElementById('calendarToday').addEventListener('click', () => { setDate(today()); document.getElementById('datePickerDialog').close(); });
+document.getElementById('datePickerGrid').addEventListener('click', (event) => {
+  const dayButton = event.target.closest('[data-calendar-date]');
+  if (!dayButton) return;
+  setDate(dayButton.dataset.calendarDate);
+  document.getElementById('datePickerDialog').close();
+});
 document.getElementById('addRoutineGroupBtn').addEventListener('click', addRoutineGroup);
 document.getElementById('addItemToSection').addEventListener('click', addItem);
 document.getElementById('renameRoutineGroup').addEventListener('click', renameRoutineGroup);
