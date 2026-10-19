@@ -76,10 +76,11 @@ def filter_export(source_path, destination_path, start, end):
             return False
         if not kind.startswith("HKQuantityTypeIdentifier"):
             return False
-        metric = day["quantities"][kind]
+        unit = record.get("unit", "")
+        metric = day["quantities"][(kind, unit)]
         metric["sum"] += value
         metric["count"] += 1
-        metric["unit"] = record.get("unit", metric["unit"])
+        metric["unit"] = unit
         counts["quantity_samples"] += 1
         return True
 
@@ -131,12 +132,12 @@ def filter_export(source_path, destination_path, start, end):
                 output.write(ET.tostring(child, encoding="unicode"))
         for day_key, summary in sorted(summaries.items()):
             timestamp = f"{day_key}T12:00:00"
-            for kind, metric in summary["quantities"].items():
-                if kind in sum_types:
+            for (kind, unit), metric in summary["quantities"].items():
+                if kind in sum_types or kind.startswith("HKQuantityTypeIdentifierDietary"):
                     value = metric["sum"]
                 else:
                     value = metric["sum"] / metric["count"]
-                record = ET.Element("Record", {"type": kind, "sourceName": "Thyroid Tracker daily summary", "unit": metric["unit"], "startDate": timestamp, "endDate": timestamp, "value": f"{value:.6f}"})
+                record = ET.Element("Record", {"type": kind, "sourceName": "Thyroid Tracker daily summary", "unit": unit, "startDate": timestamp, "endDate": timestamp, "value": f"{value:.6f}"})
                 output.write(ET.tostring(record, encoding="unicode"))
             if summary["sleep"]:
                 minutes = sum(summary["sleep"])
@@ -172,8 +173,8 @@ def main():
         print(f"Saved filtered export: {args.output}")
         print(f"Date range: {start.isoformat()} through {end.isoformat()} (inclusive)")
         print(f"Days summarized: {day_count:,}")
-        print(f"Heart-rate samples: {counts['heart_rate']:,}; step samples: {counts['steps']:,}")
-        print(f"Sleep intervals: {counts['sleep_intervals']:,}; workouts: {counts['workouts']:,}")
+        print(f"Numeric quantity samples retained: {counts['quantity_samples']:,}")
+        print(f"Sleep intervals retained: {counts['sleep_intervals']:,}; workouts retained: {counts['workouts']:,}")
         print(f"Unsupported/out-of-range records skipped: {counts['ignored_records']:,}")
         print(f"Output size: {size_mb:.1f} MB")
         return

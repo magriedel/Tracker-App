@@ -1,6 +1,6 @@
 import { Chess } from './chess-engine.js';
 import { interpretQuickUpdate } from './quick-update.js';
-import { renderAnalysis } from './analysis.js?v=5';
+import { renderAnalysis } from './analysis.js?v=6';
 import { WISDOM } from './wisdom.js';
 import { canonicalLabMarker, labMarkerIdentity, readPdfLabRows } from './lab-pdf.js?v=5';
 import { DEFAULT_LAB_CATEGORIES, catalogCategoryForMarker, catalogMarkerDefinition, defaultLabCategories, demographicReference, labUnitConversion, standardizeLabResult } from './lab-catalog.js';
@@ -900,7 +900,9 @@ function parseAppleHealthXml(xmlText) {
     if (!Number.isFinite(value)) return;
     const shortType = type.slice('HKQuantityTypeIdentifier'.length);
     const summary = bucket(key);
-    const metric = summary.metrics[shortType] || (summary.metrics[shortType] = { value: 0, count: 0, unit: record.getAttribute('unit') || '', aggregation: sumTypes.has(shortType) ? 'sum' : 'average' });
+    const unit = record.getAttribute('unit') || '';
+    const metricKey = `${shortType}|${unit}`;
+    const metric = summary.metrics[metricKey] || (summary.metrics[metricKey] = { type: shortType, value: 0, count: 0, unit, aggregation: sumTypes.has(shortType) || shortType.startsWith('Dietary') ? 'sum' : 'average' });
     if (shortType === 'OxygenSaturation' && metric.unit === '%' && value > 0 && value <= 1) value *= 100;
     metric.value += value;
     metric.count += 1;
@@ -946,8 +948,9 @@ function renderHealthSummary() {
   if (!dataForDay) { container.innerHTML = ''; return; }
   draft().health = dataForDay;
   const metricLabels = { HeartRateVariabilitySDNN: 'HRV (SDNN)', RestingHeartRate: 'Resting heart rate', OxygenSaturation: 'Blood oxygen', RespiratoryRate: 'Respiratory rate', WalkingHeartRateAverage: 'Walking heart rate', BodyTemperature: 'Body temperature', BasalBodyTemperature: 'Basal body temperature', AppleSleepingWristTemperature: 'Wrist temperature', VO2Max: 'VO2 max', BloodGlucose: 'Blood glucose', BodyMass: 'Body weight', BodyMassIndex: 'BMI', BodyFatPercentage: 'Body fat', ActiveEnergyBurned: 'Active energy', BasalEnergyBurned: 'Basal energy', DistanceWalkingRunning: 'Walking/running distance', DistanceCycling: 'Cycling distance', DistanceSwimming: 'Swimming distance', FlightsClimbed: 'Flights climbed', AppleExerciseTime: 'Exercise time', AppleStandTime: 'Stand time', PushCount: 'Pushes', SwimmingStrokeCount: 'Swimming strokes', StandHour: 'Stand hours', StepCount: 'Steps', HeartRate: 'Heart rate' };
-  const metrics = Object.entries(dataForDay.metrics || {}).filter(([name]) => !['HeartRate', 'StepCount'].includes(name)).map(([name, metric]) => {
-    const label = metricLabels[name] || name.replace(/([a-z])([A-Z])/g, '$1 $2');
+  const metrics = Object.entries(dataForDay.metrics || {}).filter(([, metric]) => !['HeartRate', 'StepCount'].includes(metric.type)).map(([key, metric]) => {
+    const type = metric.type || key.split('|', 1)[0];
+    const label = metricLabels[type] || type.replace(/([a-z])([A-Z])/g, '$1 $2');
     return `${label}: ${Number(metric.value).toLocaleString(undefined, { maximumFractionDigits: 2 })}${metric.unit ? ` ${metric.unit}` : ''}`;
   });
   const activitySummary = Object.entries(dataForDay.workoutsByType || {}).map(([type, values]) => `${type}: ${Math.round(values.exerciseMinutes)} min · ${values.workouts} workout${values.workouts === 1 ? '' : 's'}`);

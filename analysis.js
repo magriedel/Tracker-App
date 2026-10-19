@@ -56,12 +56,17 @@ function buildMetrics(ctx) {
   const workoutTypes = [...new Set(ctx.healthByDate ? Object.values(ctx.healthByDate).flatMap((summary) => Object.keys(summary.workoutsByType || {})) : [])];
   workoutTypes.forEach((type) => metrics.push({ name: `Watch ${type} (min)`, get: (entry) => num(entry.health?.workoutsByType?.[type]?.exerciseMinutes) }));
   const healthMetricLabels = { HeartRateVariabilitySDNN: 'HRV (SDNN)', RestingHeartRate: 'Resting heart rate', OxygenSaturation: 'Blood oxygen', RespiratoryRate: 'Respiratory rate', WalkingHeartRateAverage: 'Walking heart rate', BodyTemperature: 'Body temperature', BasalBodyTemperature: 'Basal body temperature', AppleSleepingWristTemperature: 'Wrist temperature', VO2Max: 'VO2 max', BloodGlucose: 'Blood glucose', BodyMass: 'Body weight', BodyMassIndex: 'BMI', BodyFatPercentage: 'Body fat', ActiveEnergyBurned: 'Active energy', BasalEnergyBurned: 'Basal energy', DistanceWalkingRunning: 'Walking/running distance', DistanceCycling: 'Cycling distance', DistanceSwimming: 'Swimming distance', FlightsClimbed: 'Flights climbed', AppleExerciseTime: 'Exercise time', AppleStandTime: 'Stand time', PushCount: 'Pushes', SwimmingStrokeCount: 'Swimming strokes', StandHour: 'Stand hours' };
-  const healthMetricTypes = new Set(Object.values(ctx.healthByDate || {}).flatMap((summary) => Object.keys(summary.metrics || {})).filter((type) => !['HeartRate', 'StepCount'].includes(type)));
-  healthMetricTypes.forEach((type) => {
-    const metric = Object.values(ctx.healthByDate || {}).map((summary) => summary.metrics?.[type]).find(Boolean);
+  const healthMetricTypes = new Map();
+  Object.values(ctx.healthByDate || {}).forEach((summary) => Object.entries(summary.metrics || {}).forEach(([key, metric]) => {
+    const type = metric.type || key.split('|', 1)[0];
+    if (['HeartRate', 'StepCount'].includes(type)) return;
+    const unit = metric.unit || '';
+    const metricKey = `${type}|${unit}`;
+    if (!healthMetricTypes.has(metricKey)) healthMetricTypes.set(metricKey, { key, type, unit });
+  }));
+  healthMetricTypes.forEach(({ key, type, unit }) => {
     const label = healthMetricLabels[type] || type.replace(/([a-z])([A-Z])/g, '$1 $2');
-    const unit = metric?.unit ? ` · ${metric.unit}` : '';
-    metrics.push({ name: `Watch ${label}${unit}`, get: (entry) => num(entry.health?.metrics?.[type]?.value) });
+    metrics.push({ name: `Watch ${label}${unit ? ` · ${unit}` : ''}`, get: (entry) => num(entry.health?.metrics?.[key]?.value) });
   });
   [...new Set(ctx.labs.map((lab) => canonicalLabMarker(lab.marker)))].forEach((marker) => {
     const values = ctx.labs.filter((lab) => labMarkerIdentity(lab.marker) === labMarkerIdentity(marker));
