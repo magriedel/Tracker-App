@@ -29,7 +29,7 @@
     <div class="app-shell">
       <header class="topbar">
         <div class="brand-lockup"><span class="brand-mark" aria-hidden="true"><svg viewBox="0 0 512 512" width="100%" height="100%" style="display:block" focusable="false"><path d="M256 77c-25 54-117 119-117 219a117 117 0 0 0 234 0C373 196 281 131 256 77Z" fill="#d8e7dc"/><path d="M256 184v193M194 248h124" fill="none" stroke="#245e4d" stroke-linecap="round" stroke-width="25"/></svg></span><div><p class="eyebrow">Private health journal</p><h1>Thyroid Tracker</h1></div></div>
-        <div class="top-actions"><div class="date-export"><label class="date-control"><span>Day</span><button id="entryDate" class="date-picker-trigger" type="button" aria-haspopup="dialog" aria-controls="datePickerDialog" aria-expanded="false"></button></label><button id="exportJsonBtn" class="icon-button" type="button" aria-label="Export submitted records" title="Export submitted records">Export</button></div><div class="submit-cluster"><button id="submitDay" class="button submit-button" type="button">Submit day</button><span id="submissionStatus">Today is not submitted</span><div class="submission-history-buttons"><button id="undoSubmission" class="icon-button" type="button" aria-label="Undo last submission" title="Undo last submission" disabled>↶</button><button id="redoSubmission" class="icon-button" type="button" aria-label="Redo submission" title="Redo submission" disabled>↷</button></div></div></div>
+        <div class="top-actions"><div class="date-export"><label class="date-control"><span>Day</span><button id="entryDate" class="date-picker-trigger" type="button" aria-haspopup="dialog" aria-controls="datePickerDialog" aria-expanded="false"></button></label><button id="exportJsonBtn" class="icon-button" type="button" aria-label="Export complete app backup" title="Export complete app backup">Export</button><label class="icon-button backup-import-button" for="importBackupFile" title="Restore a complete app backup">Import</label><input id="importBackupFile" type="file" accept=".json,application/json" hidden /></div><div class="submit-cluster"><button id="submitDay" class="button submit-button" type="button">Submit day</button><span id="submissionStatus">Today is not submitted</span><div class="submission-history-buttons"><button id="undoSubmission" class="icon-button" type="button" aria-label="Undo last submission" title="Undo last submission" disabled>↶</button><button id="redoSubmission" class="icon-button" type="button" aria-label="Redo submission" title="Redo submission" disabled>↷</button></div></div></div>
       </header>
 
       <dialog id="datePickerDialog" class="date-picker-dialog" aria-labelledby="datePickerHeading">
@@ -119,7 +119,7 @@
       <dialog id="labCategoryMenu" class="routine-group-menu"><div class="dialog-heading"><div><p class="eyebrow">Biomarker category</p><h2 id="labCategoryMenuTitle">Category</h2></div><button id="closeLabCategoryMenu" class="icon-button" type="button" aria-label="Close category menu">Done</button></div><div class="routine-group-menu-actions"><button id="renameLabCategory" class="button secondary" type="button">Rename category</button><button id="deleteLabCategory" class="button danger-button" type="button">Delete category</button></div></dialog>
       <div id="toast" class="toast" role="status" aria-live="polite"></div>
     </div>
-    <script type="module" src="./tracker.js?v=46"></script>
-    <script type="module" src="./folders.js?v=1"></script>
+    <script type="module" src="./tracker.js?v=48"></script>
+    <script type="module" src="./folders.js?v=2"></script>
   </body>
 </html>

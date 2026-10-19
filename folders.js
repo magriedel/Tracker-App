@@ -20,6 +20,72 @@ function requestResult(request) {
   });
 }
 
+function blobToBase64(blob) {
+  return blob.arrayBuffer().then((buffer) => {
+    const bytes = new Uint8Array(buffer);
+    const chunkSize = 0x8000;
+    let binary = '';
+    for (let offset = 0; offset < bytes.length; offset += chunkSize) binary += String.fromCharCode(...bytes.subarray(offset, offset + chunkSize));
+    return btoa(binary);
+  });
+}
+
+function base64ToBlob(encoded, type) {
+  const binary = atob(encoded);
+  const bytes = new Uint8Array(binary.length);
+  for (let index = 0; index < binary.length; index += 1) bytes[index] = binary.charCodeAt(index);
+  return new Blob([bytes], { type: type || 'application/octet-stream' });
+}
+
+async function exportFolderData() {
+  const [folders, documents] = await Promise.all([getAll('folders'), getAll('documents')]);
+  return {
+    folders,
+    documents: await Promise.all(documents.map(async (document) => ({
+      id: document.id,
+      folderId: document.folderId,
+      name: document.name,
+      type: document.type || '',
+      size: document.size,
+      addedAt: document.addedAt,
+      contentsBase64: await blobToBase64(document.blob)
+    })))
+  };
+}
+
+async function replaceFolderData(folderData) {
+  const transaction = database.transaction(['folders', 'documents'], 'readwrite');
+  const completion = transactionResult(transaction);
+  const foldersStore = transaction.objectStore('folders');
+  const documentsStore = transaction.objectStore('documents');
+  foldersStore.clear();
+  documentsStore.clear();
+  folderData.folders.forEach((folder) => foldersStore.put(folder));
+  folderData.documents.forEach((document) => {
+    const { contentsBase64, ...metadata } = document;
+    documentsStore.put({ ...metadata, blob: base64ToBlob(contentsBase64, document.type) });
+  });
+  await completion;
+  await render();
+}
+
+const databaseReady = openDatabase();
+
+window.addEventListener('thyroid-backup-export', async (event) => {
+  try {
+    await databaseReady;
+    event.detail.resolve(await exportFolderData());
+  } catch (error) { event.detail.reject(error); }
+});
+
+window.addEventListener('thyroid-backup-import', async (event) => {
+  try {
+    await databaseReady;
+    await replaceFolderData(event.detail.folderData);
+    event.detail.resolve();
+  } catch (error) { event.detail.reject(error); }
+});
+
 function transactionResult(transaction) {
   return new Promise((resolve, reject) => {
     transaction.oncomplete = resolve;
@@ -207,8 +273,10 @@ root.addEventListener('click', async (event) => {
 
 try {
   if (!('indexedDB' in window)) throw new Error('This browser does not support local document storage.');
-  database = await openDatabase();
+  database = await databaseReady;
   await render();
+  window.thyroidFolderBackupReady = true;
+  window.dispatchEvent(new Event('thyroid-folders-ready'));
 } catch (error) {
   status.textContent = error?.message || 'Local document storage could not be opened.';
   root.innerHTML = '<div class="folders-empty"><strong>Folders are unavailable</strong>Local document storage could not be opened in this browser.</div>';

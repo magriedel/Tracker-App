@@ -7,6 +7,7 @@ import { DEFAULT_LAB_CATEGORIES, catalogCategoryForMarker, catalogMarkerDefiniti
 
 const STORAGE_KEY = 'thyroid-tracker-v2';
 const LEGACY_KEY = 'thyroid-tracker-local-data-v1';
+const PENDING_BACKUP_KEY = 'thyroid-tracker-pending-complete-backup-v1';
 const SYMPTOMS = ['Fatigue', 'Joint pain', 'Appetite', 'Brain fog', 'Anxiety', 'Tremor', 'Mood', 'Heat intolerance', 'Palpitations'];
 const STOOL_FORMS = [
   'Pellet-like, hard stool',
@@ -51,9 +52,10 @@ const makeDraft = (routine, prior = null) => ({
 
 function loadData() {
   try {
-    const saved = JSON.parse(localStorage.getItem(STORAGE_KEY));
+    const pendingBackup = JSON.parse(localStorage.getItem(PENDING_BACKUP_KEY) || 'null');
+    const saved = pendingBackup?.appData || JSON.parse(localStorage.getItem(STORAGE_KEY));
     if (saved?.days && Array.isArray(saved.labs)) {
-      const submittedDays = Object.fromEntries(Object.entries(saved.days).filter(([, day]) => day.submitted || Object.keys(day.parts || {}).length || day.draft || day.submissionActions?.length).map(([date, day]) => [date, { submitted: day.submitted, submissionHistory: day.submissionHistory || [], parts: day.parts || {}, draft: day.draft, dirtySections: day.dirtySections || [], submissionActions: day.submissionActions || [], submissionCursor: day.submissionCursor ?? day.submissionActions?.length ?? 0 }]));
+      const submittedDays = Object.fromEntries(Object.entries(saved.days).filter(([, day]) => day.submitted || Object.keys(day.parts || {}).length || day.draft || day.dirtySections?.length || day.submissionActions?.length).map(([date, day]) => [date, { ...day, submissionHistory: day.submissionHistory || [], parts: day.parts || {}, dirtySections: day.dirtySections || [], submissionActions: day.submissionActions || [], submissionCursor: day.submissionCursor ?? day.submissionActions?.length ?? 0 }]));
       const puzzle = { solved: 0, streak: 0, bestStreak: 0, targetRating: saved.puzzle?.rating ?? 1200, ...saved.puzzle };
       if (!puzzle.targetRating || (puzzle.solved === 0 && puzzle.targetRating === 800)) puzzle.targetRating = 1200;
       return { doseOverrides: {}, routineOverrides: {}, deletedRoutineItems: [], routineGroups: TIME_GROUPS.map(([group]) => group), healthByDate: {}, customSymptoms: [], puzzle: { solved: 0, streak: 0, bestStreak: 0, targetRating: 1200 }, ...saved, puzzle, days: submittedDays };
@@ -125,6 +127,22 @@ let pendingLabImport = null;
 function saveData() {
   const submittedDays = Object.fromEntries(Object.entries(data.days).filter(([, day]) => day.submitted || Object.keys(day.parts || {}).length || day.draft || day.submissionActions?.length).map(([date, day]) => [date, { submitted: day.submitted, submissionHistory: day.submissionHistory || [], parts: day.parts || {}, draft: day.draft, dirtySections: day.dirtySections || [], submissionActions: day.submissionActions || [], submissionCursor: day.submissionCursor ?? day.submissionActions?.length ?? 0 }]));
   localStorage.setItem(STORAGE_KEY, JSON.stringify({ days: submittedDays, labs: data.labs || [], labImports: data.labImports || {}, labReferences: data.labReferences || {}, customItems: data.customItems || [], customSymptoms: data.customSymptoms || [], doseOverrides: data.doseOverrides || {}, routineOverrides: data.routineOverrides || {}, deletedRoutineItems: data.deletedRoutineItems || [], routineGroups: routineGroups(), desiredRanges: data.desiredRanges || {}, healthByDate: data.healthByDate || {}, labCategories: data.labCategories || defaultLabCategories(), labMarkerAliases: data.labMarkerAliases || {}, hiddenLabMarkers: data.hiddenLabMarkers || {}, labUnits: data.labUnits || {}, labProfile: data.labProfile || {}, puzzle: { ...data.puzzle, rating: undefined } }));
+}
+
+async function restorePendingBackup() {
+  const raw = localStorage.getItem(PENDING_BACKUP_KEY);
+  if (!raw) return;
+  const backup = validateBackup(JSON.parse(raw));
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(backup.appData));
+  if (backup.localSettings?.legacyData === null || backup.localSettings?.legacyData === undefined) localStorage.removeItem(LEGACY_KEY);
+  else localStorage.setItem(LEGACY_KEY, backup.localSettings.legacyData);
+  if (backup.localSettings?.labTextScale === null || backup.localSettings?.labTextScale === undefined) localStorage.removeItem('thyroid-tracker-lab-text-scale');
+  else localStorage.setItem('thyroid-tracker-lab-text-scale', backup.localSettings.labTextScale);
+  if (!window.thyroidFolderBackupReady) await new Promise((resolve) => window.addEventListener('thyroid-folders-ready', resolve, { once: true }));
+  await requestFolderBackup('import', backup.folders);
+  Object.entries(backup.localStorage || {}).forEach(([key, value]) => localStorage.setItem(key, value));
+  localStorage.removeItem(PENDING_BACKUP_KEY);
+  toast('Complete backup restored.');
 }
 
 function recordSubmissionAction(date, kind, section, before, after, draftBefore) {
@@ -1959,9 +1977,72 @@ async function importLabs(file) {
   reader.readAsText(file);
 }
 
-function exportJson() {
-  const submittedDays = Object.fromEntries(Object.entries(data.days).filter(([, day]) => day.submitted).map(([date, day]) => [date, { submitted: day.submitted }]));
-  download(`thyroid-tracker-${activeDate}.json`, JSON.stringify({ ...data, days: submittedDays }, null, 2), 'application/json');
+function requestFolderBackup(action, folderData) {
+  return new Promise((resolve, reject) => {
+    const timeout = window.setTimeout(() => reject(new Error('Document storage did not respond. Reload the app and try again.')), 30000);
+    const settle = (handler) => (value) => { clearTimeout(timeout); handler(value); };
+    window.dispatchEvent(new CustomEvent(`thyroid-backup-${action}`, {
+      detail: { resolve: settle(resolve), reject: settle(reject), folderData }
+    }));
+  });
+}
+
+async function exportJson() {
+  const button = document.getElementById('exportJsonBtn');
+  button.disabled = true;
+  try {
+    const backup = {
+      format: 'thyroid-tracker-complete-backup',
+      version: 1,
+      exportedAt: new Date().toISOString(),
+      appData: JSON.parse(JSON.stringify(data)),
+      localSettings: {
+        labTextScale: localStorage.getItem('thyroid-tracker-lab-text-scale'),
+        legacyData: localStorage.getItem(LEGACY_KEY)
+      },
+      folders: await requestFolderBackup('export'),
+      localStorage: Object.fromEntries(Array.from({ length: localStorage.length }, (_, index) => localStorage.key(index)).filter((key) => key && key !== PENDING_BACKUP_KEY && key !== STORAGE_KEY && key !== LEGACY_KEY && key !== 'thyroid-tracker-lab-text-scale').map((key) => [key, localStorage.getItem(key)]))
+    };
+    download(`thyroid-tracker-backup-${today()}.json`, JSON.stringify(backup), 'application/json');
+    toast('Complete backup exported. Keep the JSON file somewhere safe.');
+  } catch (error) {
+    toast(error.message || 'Could not export the complete backup.');
+  } finally { button.disabled = false; }
+}
+
+function validateBackup(backup) {
+  if (backup?.format !== 'thyroid-tracker-complete-backup' || backup.version !== 1) throw new Error('This is not a supported complete Thyroid Tracker backup.');
+  if (!backup.appData || !backup.appData.days || Array.isArray(backup.appData.days) || !Array.isArray(backup.appData.labs)) throw new Error('The backup is missing tracker day or lab data.');
+  if (!backup.folders || !Array.isArray(backup.folders.folders) || !Array.isArray(backup.folders.documents)) throw new Error('The backup is missing folder/document data.');
+  const folderIds = new Set();
+  backup.folders.folders.forEach((folder) => {
+    if (!folder || typeof folder.id !== 'string' || typeof folder.name !== 'string' || folderIds.has(folder.id)) throw new Error('The backup contains invalid folder records.');
+    folderIds.add(folder.id);
+  });
+  const documentIds = new Set();
+  backup.folders.documents.forEach((document) => {
+    if (!document || typeof document.id !== 'string' || typeof document.name !== 'string' || !folderIds.has(document.folderId) || typeof document.contentsBase64 !== 'string' || documentIds.has(document.id) || !/^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/.test(document.contentsBase64)) throw new Error('The backup contains invalid folder document data.');
+    documentIds.add(document.id);
+  });
+  return backup;
+}
+
+async function importBackup(file) {
+  if (!file) return;
+  const input = document.getElementById('importBackupFile');
+  try {
+    const backup = validateBackup(JSON.parse(await file.text()));
+    const dayCount = Object.keys(backup.appData.days).length;
+    const labCount = backup.appData.labs.length;
+    const documentCount = backup.folders.documents.length;
+    if (!confirm(`Restore this backup from ${new Date(backup.exportedAt).toLocaleString()}? It contains ${dayCount} saved dates, ${labCount} lab results, ${backup.folders.folders.length} folders, and ${documentCount} files. This replaces all data currently stored in this app on this device.`)) return;
+
+    localStorage.setItem(PENDING_BACKUP_KEY, JSON.stringify(backup));
+    toast('Backup restored. Reloading the tracker…');
+    window.setTimeout(() => window.location.reload(), 250);
+  } catch (error) {
+    toast(error instanceof SyntaxError ? 'That file is not valid JSON.' : error.message || 'Could not restore this backup.');
+  } finally { input.value = ''; }
 }
 function exportCsv() {
   const rows = [['marker', 'date', 'value', 'units', 'reference'], ...data.labs.map((lab) => [lab.marker, lab.date, lab.value, lab.units, lab.reference])];
@@ -2217,6 +2298,7 @@ document.getElementById('closeWisdom').addEventListener('click', () => { const o
 document.getElementById('submitRoutinePart').addEventListener('click', submitRoutinePart);
 document.getElementById('submitCheckinPart').addEventListener('click', submitCheckinPart);
 document.getElementById('exportJsonBtn').addEventListener('click', exportJson);
+document.getElementById('importBackupFile').addEventListener('change', (event) => importBackup(event.target.files[0]));
 document.getElementById('exportCsvBtn').addEventListener('click', exportCsv);
 document.getElementById('labForm').addEventListener('submit', addLab);
 document.getElementById('labProfileForm').addEventListener('submit', (event) => {
@@ -2266,5 +2348,6 @@ document.getElementById('labProfileAge').value = data.labProfile.age ?? '';
 document.getElementById('labProfileSex').value = data.labProfile.sex ?? '';
 migrateExistingLabCatalog();
 setupTabs(); setupVoice(); setDate(activeDate); renderLabs(); renderMomentum(); renderPuzzle(); renderLocalCorrelations(); saveData();
+restorePendingBackup().catch((error) => toast(`Backup data loaded, but folders could not be restored: ${error.message}`));
 
 if ('serviceWorker' in navigator) window.addEventListener('load', () => navigator.serviceWorker.register('./sw.js').catch(() => {}));
