@@ -1,6 +1,6 @@
 import { Chess } from './chess-engine.js';
 import { interpretQuickUpdate } from './quick-update.js';
-import { renderAnalysis } from './analysis.js?v=2';
+import { renderAnalysis } from './analysis.js?v=3';
 import { WISDOM } from './wisdom.js';
 import { canonicalLabMarker, labMarkerIdentity, readPdfLabRows } from './lab-pdf.js?v=5';
 import { DEFAULT_LAB_CATEGORIES, catalogCategoryForMarker, catalogMarkerDefinition, defaultLabCategories, demographicReference, labUnitConversion, standardizeLabResult } from './lab-catalog.js';

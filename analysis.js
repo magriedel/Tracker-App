@@ -3,7 +3,7 @@
 import { canonicalLabMarker, labMarkerIdentity } from './lab-pdf.js';
 
 const PALETTE = ['#245e4d', '#9a641c', '#385e79', '#a23f55', '#6b5aa8', '#2f8f9d', '#7a7a2c', '#555f5b'];
-const state = { range: '30', metrics: null, item: '', group: '', outcome: 'Energy', lag: '0', minDays: '6' };
+const state = { range: '30', metrics: null, item: '', group: '', outcome: 'Energy', lag: '0', minDays: '6', compareItems: [], compareMetrics: [], compareMode: 'all', compareRange: 'all', compareFrom: '', compareTo: '', compareLag: '0', compareMinDays: '4' };
 
 const esc = (value) => String(value ?? '').replace(/[&<>"']/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char]));
 const dayMs = 86400000;
@@ -131,6 +131,51 @@ function comparison(model, filtered) {
   if (!rows.length) return `<div class="empty-state">${esc(state.item)} needs both on and off days with recorded measures in this period.</div>`;
   const scale = (row) => row.metric.max || Math.max(...row.on, ...row.off, 1);
   return rows.map((row) => { const a = mean(row.on); const b = mean(row.off); const top = scale(row); const delta = a - b; return `<div class="an-cmp"><strong>${esc(row.metric.name)}</strong><div class="an-cmp-bars"><div><i class="on" style="width:${Math.max(2, (a / top) * 100)}%"></i><span>On ${fmt(a)} (${row.on.length}d)</span></div><div><i class="off" style="width:${Math.max(2, (b / top) * 100)}%"></i><span>Off ${fmt(b)} (${row.off.length}d)</span></div></div><b class="${delta > 0 ? 'up' : delta < 0 ? 'down' : ''}">${delta > 0 ? '+' : ''}${fmt(delta, 2)}</b></div>`; }).join('');
+}
+
+function customComparison(model) {
+  const itemGroups = new Map();
+  model.records.forEach(({ entry }) => entry.routine.forEach((item) => {
+    if (!itemGroups.has(item.name)) itemGroups.set(item.name, item.group || 'Other');
+  }));
+  const itemOptions = [...itemGroups].sort(([a], [b]) => a.localeCompare(b));
+  if (!state.compareItems.length) state.compareItems = itemOptions.slice(0, 1).map(([name]) => name);
+  state.compareItems = state.compareItems.filter((name) => itemGroups.has(name));
+  if (!state.compareMetrics.length) state.compareMetrics = model.metrics.slice(0, 4).map((metric) => metric.name);
+  state.compareMetrics = state.compareMetrics.filter((name) => model.metrics.some((metric) => metric.name === name));
+  const selectedItemCount = state.compareItems.length;
+  const selectedMetricCount = state.compareMetrics.length;
+
+  const itemChoices = itemOptions.map(([name, group]) => `<label class="an-select-option"><input type="checkbox" data-compare-item="${esc(name)}" ${state.compareItems.includes(name) ? 'checked' : ''}><span>${esc(name)}</span><small>${esc(group)}</small></label>`).join('');
+  const metricChoices = model.metrics.map((metric) => `<label class="an-select-option"><input type="checkbox" data-compare-metric="${esc(metric.name)}" ${state.compareMetrics.includes(metric.name) ? 'checked' : ''}><span>${esc(metric.name)}</span><small>${metric.lab ? 'Lab' : metric.symptom ? 'Symptom' : /Watch/.test(metric.name) ? 'Apple Health' : 'Check-in'}</small></label>`).join('');
+  const rangeOptions = [['all', 'All dates'], ['30', 'Last 30 days'], ['90', 'Last 90 days'], ['365', 'Last year']].map(([value, label]) => `<option value="${value}" ${state.compareRange === value ? 'selected' : ''}>${label}</option>`).join('');
+  const selectedMetrics = model.metrics.filter((metric) => state.compareMetrics.includes(metric.name));
+  const selectedItems = state.compareItems;
+  const cutoff = state.compareRange === 'all' ? '' : toKey(Date.now() - Number(state.compareRange) * dayMs);
+  const customDates = Boolean(state.compareFrom || state.compareTo);
+  const eligible = model.records.filter((record) => (customDates || !cutoff || record.date >= cutoff) && (!state.compareFrom || record.date >= state.compareFrom) && (!state.compareTo || record.date <= state.compareTo));
+  const rows = selectedMetrics.map((metric) => {
+    const pairs = [];
+    eligible.forEach((record) => {
+      const itemStates = selectedItems.map((name) => itemOn(record.entry, name));
+      if (!itemStates.length || itemStates.some((value) => value === null)) return;
+      const exposed = state.compareMode === 'all' ? itemStates.every(Boolean) : itemStates.some(Boolean);
+      const outcome = outcomeOn(model, record, metric, Number(state.compareLag));
+      if (outcome === null || outcome === undefined || outcome === '' || !Number.isFinite(Number(outcome))) return;
+      pairs.push({ exposed, value: Number(outcome) });
+    });
+    const on = pairs.filter((pair) => pair.exposed).map((pair) => pair.value);
+    const off = pairs.filter((pair) => !pair.exposed).map((pair) => pair.value);
+    return { metric, on, off, paired: pairs.length };
+  }).filter((row) => row.on.length >= Number(state.compareMinDays) && row.off.length >= Number(state.compareMinDays));
+
+  const table = !selectedItems.length || !selectedMetrics.length
+    ? '<p class="empty-state">Choose at least one routine item and one outcome measure.</p>'
+    : rows.length
+      ? `<div class="an-compare-table-wrap"><table class="an-compare-table"><thead><tr><th>Outcome</th><th>Selected ${state.compareMode === 'all' ? 'all on' : 'any on'}</th><th>Otherwise</th><th>Difference</th><th>Days</th></tr></thead><tbody>${rows.map(({ metric, on, off, paired }) => { const onMean = mean(on); const offMean = mean(off); const delta = onMean - offMean; return `<tr><th scope="row">${esc(metric.name)}</th><td>${fmt(onMean, 2)} <small>n=${on.length}</small></td><td>${fmt(offMean, 2)} <small>n=${off.length}</small></td><td class="${delta > 0 ? 'up' : delta < 0 ? 'down' : ''}">${delta > 0 ? '+' : ''}${fmt(delta, 2)}</td><td>${paired}</td></tr>`; }).join('')}</tbody></table></div><p class="fine-print">Only dates with recorded exposure and outcome are included. Means are descriptive, not causal.</p>`
+      : `<p class="empty-state">No selected outcomes have at least ${esc(state.compareMinDays)} exposed and ${esc(state.compareMinDays)} comparison days with data in this window.</p>`;
+
+  return `<section class="an-builder"><div class="an-builder-heading"><div><h3>Custom comparison</h3><p>Compare one or more routine items with symptoms, lab results, or Apple Health measures.</p></div></div><div class="an-builder-filters"><label class="field compact-field"><span>Date window</span><select data-compare-filter="compareRange">${rangeOptions}</select></label><label class="field compact-field"><span>Start date</span><input type="date" data-compare-filter="compareFrom" value="${esc(state.compareFrom)}"></label><label class="field compact-field"><span>End date</span><input type="date" data-compare-filter="compareTo" value="${esc(state.compareTo)}"></label><label class="field compact-field"><span>Combination means</span><select data-compare-filter="compareMode"><option value="all" ${state.compareMode === 'all' ? 'selected' : ''}>All selected items are on</option><option value="any" ${state.compareMode === 'any' ? 'selected' : ''}>At least one selected item is on</option></select></label><label class="field compact-field"><span>Outcome timing</span><select data-compare-filter="compareLag"><option value="0" ${state.compareLag === '0' ? 'selected' : ''}>Same day</option><option value="1" ${state.compareLag === '1' ? 'selected' : ''}>Next day</option><option value="2" ${state.compareLag === '2' ? 'selected' : ''}>2 days later</option></select></label><label class="field compact-field"><span>Minimum days per side</span><select data-compare-filter="compareMinDays">${[['2','2'],['4','4'],['6','6'],['10','10'],['14','14']].map(([value,label])=>`<option value="${value}" ${state.compareMinDays===value?'selected':''}>${label}</option>`).join('')}</select></label></div><div class="an-builder-columns"><fieldset><legend>Routine items (${selectedItemCount})</legend><input class="an-list-search" type="search" data-compare-search="item" placeholder="Filter routine items" aria-label="Filter routine items"><div class="an-select-list">${itemChoices || '<p class="fine-print">No routine item history yet.</p>'}</div></fieldset><fieldset><legend>Outcome measures (${selectedMetricCount})</legend><input class="an-list-search" type="search" data-compare-search="metric" placeholder="Filter symptoms, labs, health" aria-label="Filter outcome measures"><div class="an-select-list">${metricChoices}</div></fieldset></div><div class="an-builder-results"><h4>On vs comparison days</h4>${table}</div></section>`;
 }
 
 function changeLog(model, filtered) {
@@ -277,10 +322,18 @@ export function renderAnalysis(root, ctx) {
     ${section('Routine adherence', 'Green = on', adherenceHeatmap(model, filtered))}
     ${section('Symptom intensity', 'Darker = stronger', symptomHeatmap(model, filtered))}
     ${section('On vs off', state.item ? esc(state.item) : 'Pick a focus item', comparison(model, filtered))}
+    ${section('Custom comparison', 'Multiple routine items and measures', customComparison(model))}
     ${section('Change log', 'Starts, stops, dose changes', changeLog(model, filtered))}
     ${section('Potential patterns', state.lag === '0' ? 'Same day' : `Outcome ${state.lag} day(s) later`, correlations(model, filtered))}
     ${section('Public studies', 'Search terms only; no tracker measurements sent', '<div data-study-results><p class="fine-print">Choose “Find studies” beside a candidate pattern to search PubMed after confirmation.</p></div>')}`;
   root.querySelectorAll('[data-filter]').forEach((select) => select.addEventListener('change', () => { state[select.dataset.filter] = select.value; if (select.dataset.filter === 'group') state.item = ''; renderAnalysis(root, ctx); }));
+  root.querySelectorAll('[data-compare-filter]').forEach((select) => select.addEventListener('change', () => { state[select.dataset.compareFilter] = select.value; renderAnalysis(root, ctx); }));
+  root.querySelectorAll('[data-compare-search]').forEach((input) => input.addEventListener('input', () => {
+    const query = input.value.trim().toLowerCase();
+    input.nextElementSibling.querySelectorAll('.an-select-option').forEach((option) => { option.hidden = !option.textContent.toLowerCase().includes(query); });
+  }));
+  root.querySelectorAll('[data-compare-item]').forEach((input) => input.addEventListener('change', () => { state.compareItems = [...root.querySelectorAll('[data-compare-item]:checked')].map((box) => box.dataset.compareItem); renderAnalysis(root, ctx); }));
+  root.querySelectorAll('[data-compare-metric]').forEach((input) => input.addEventListener('change', () => { state.compareMetrics = [...root.querySelectorAll('[data-compare-metric]:checked')].map((box) => box.dataset.compareMetric); renderAnalysis(root, ctx); }));
   root.querySelectorAll('[data-study-exposure]').forEach((button) => button.addEventListener('click', () => searchStudies(root, button)));
   root.querySelectorAll('[data-metric]').forEach((box) => box.addEventListener('change', () => {
     state.metrics = [...root.querySelectorAll('[data-metric]:checked')].map((input) => input.dataset.metric);

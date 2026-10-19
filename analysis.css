@@ -49,4 +49,29 @@
 .an-study{display:grid;gap:4px;padding:10px 0;border-bottom:1px solid var(--line)}
 .an-study a{color:var(--green-dark);font-size:.82rem;font-weight:650;line-height:1.35}
 .an-study small{color:var(--muted);font-size:.7rem}
+.an-builder{padding:12px 0;border-top:1px solid var(--line)}
+.an-builder-heading h3{margin:0 0 3px;font-size:1rem}
+.an-builder-heading p{margin:0;color:var(--muted);font-size:.75rem;line-height:1.4}
+.an-builder-filters{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin:12px 0}
+.an-builder-columns{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.an-builder-columns fieldset{min-width:0;margin:0;padding:8px;border:1px solid var(--line);border-radius:7px}
+.an-builder-columns legend{padding:0 5px;color:var(--green-dark);font-size:.75rem;font-weight:700}
+.an-list-search{width:100%;min-height:34px;margin:0 0 6px;padding:6px 8px;border:1px solid var(--line);border-radius:6px;background:var(--white);color:var(--ink);font-size:.72rem}
+.an-select-list{display:grid;grid-template-columns:1fr;gap:4px;max-height:260px;overflow:auto}
+.an-select-option[hidden]{display:none}
+.an-select-option{display:grid;grid-template-columns:16px minmax(0,1fr) auto;align-items:center;gap:7px;min-height:32px;padding:4px 5px;border-radius:5px;font-size:.72rem}
+.an-select-option:hover{background:#f2f5f2}
+.an-select-option input{width:15px;height:15px;margin:0;accent-color:var(--green)}
+.an-select-option span{min-width:0;overflow-wrap:anywhere}
+.an-select-option small{color:var(--muted);font-size:.64rem}
+.an-builder-results{margin-top:14px}
+.an-builder-results h4{margin:0 0 7px;font-size:.83rem}
+.an-compare-table-wrap{overflow-x:auto}
+.an-compare-table{width:100%;border-collapse:collapse;background:var(--white);font-size:.75rem}
+.an-compare-table th,.an-compare-table td{padding:8px 7px;border-bottom:1px solid var(--line);text-align:right;white-space:nowrap}
+.an-compare-table th:first-child,.an-compare-table td:first-child{text-align:left;white-space:normal}
+.an-compare-table thead th{color:var(--muted);font-size:.68rem;font-weight:650}
+.an-compare-table tbody th{font-weight:650}
+.an-compare-table td small{display:block;color:var(--muted);font-size:.62rem}
 @media(min-width:700px){.an-filters{grid-template-columns:repeat(3,minmax(0,1fr))}.an-summary{grid-template-columns:repeat(6,minmax(0,1fr))}}
+@media(max-width:600px){.an-builder-columns{grid-template-columns:1fr}.an-builder-filters{grid-template-columns:repeat(2,minmax(0,1fr))}.an-select-list{max-height:210px}}
