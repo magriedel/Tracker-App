@@ -2,7 +2,7 @@ import { Chess } from './chess-engine.js';
 import { interpretQuickUpdate } from './quick-update.js';
 import { renderAnalysis } from './analysis.js?v=2';
 import { WISDOM } from './wisdom.js';
-import { canonicalLabMarker, labMarkerIdentity, readPdfLabRows } from './lab-pdf.js?v=4';
+import { canonicalLabMarker, labMarkerIdentity, readPdfLabRows } from './lab-pdf.js?v=5';
 import { DEFAULT_LAB_CATEGORIES, catalogCategoryForMarker, catalogMarkerDefinition, defaultLabCategories, demographicReference, labUnitConversion, standardizeLabResult } from './lab-catalog.js';
 
 const STORAGE_KEY = 'thyroid-tracker-v2';
@@ -1495,6 +1495,10 @@ function saveMarkerReference(marker, value) {
   data.labReferences ||= {};
   data.labReferences[key] = value.trim();
   data.labs.forEach((lab) => { if (markerReferenceKey(lab.marker) === key) lab.reference = value.trim(); });
+  data.desiredRanges ||= {};
+  const updatedRange = referenceBounds(value);
+  if (updatedRange) data.desiredRanges[key] = updatedRange;
+  else delete data.desiredRanges[key];
   saveData();
 }
 function saveMarkerUnits(marker, value) {
