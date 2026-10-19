@@ -94,7 +94,15 @@ function isExcludedReportLabel(marker) {
 
 function isReferenceAnnotationLine(line) {
   const normalized = normalizeMarkerText(line);
-  return /^\s*[([]\s*\d+(?:[.,]\d+)?\s*%/.test(String(line)) || /^(?:(?:i|ii|iii|iv|1st|2nd|3rd|first|second|third) trimester|(?:primer|segundo|tercer) trimestre|women|men|female|male|mujer(?:es)?|hombres|femenino|masculino|reference|reference range|normal range|normal(?: values?)?|rango de referencia|rango optimo|intervalo de referencia|age|edad|adequate|adecuado|optimal|optimo|potentially toxic|potencialmente toxico|associated with|asociado a|cardiovascular risk|riesgo cardiovascular|children|ninos|follicular phase|fase folicular|mid cycle|medio ciclo|ovulation|ovulacion|oral contraceptive|contraceptivos orales|postmenopausal|posmenopausicas?|hirsutism|hirsutismo|diabetes care|ada ranges|rangos recomendados|less than|greater than|menor de|menos de|mayor de|mas de|valores mayores de|adultos|nacidos|prediabetes|diabetes|buen control|good control|therapeutic target|objetivo terapeutico|negative|positive|equivocal|negativo|positivo|inconcluso|interpretation|interpretacion|diagnosis|diagnostico|ciclo completo|fase lutea|fase ovulatoria|con contraceptivos|mujeres por ciclo|menopausicas|en hirsutismo|with pernicious anemia|immunoglobulin|\d+ h nacidos|\d+ \d+ anos?|> \d+ anos?)\b/.test(normalized);
+  return /^\s*[([]\s*\d+(?:[.,]\d+)?\s*%/.test(String(line)) || /^(?:(?:i|ii|iii|iv|1st|2nd|3rd|first|second|third) trimester|(?:primer|segundo|tercer) trimestre|women|men|female|male|mujer(?:es)?|hombres|femenino|masculino|reference|reference range|normal range|normal(?: values?)?|rango de referencia|rango optimo|intervalo de referencia|age|edad|adequate|adecuado|optimal|optimo|potentially toxic|potencialmente toxico|associated with|asociado a|cardiovascular risk|riesgo cardiovascular|children|ninos|follicular phase|fase folicular|mid cycle|medio ciclo|ovulation|ovulacion|oral contraceptive|contraceptivos orales|postmenopausal|posmenopausicas?|hirsutism|hirsutismo|diabetes care|ada ranges|rangos recomendados|recommended(?: value| range| interval)?|valor(?:es)? recomendado(?:s)?|american association of clinical endocrinologists|national academy of clinical biochemistry|american thyroid association|aace|nacb|less than|greater than|menor de|menos de|mayor de|mas de|valores mayores de|adultos|nacidos|prediabetes|diabetes|buen control|good control|therapeutic target|objetivo terapeutico|negative|positive|equivocal|negativo|positivo|inconcluso|interpretation|interpretacion|diagnosis|diagnostico|ciclo completo|fase lutea|fase ovulatoria|con contraceptivos|mujeres por ciclo|menopausicas|en hirsutismo|with pernicious anemia|immunoglobulin|\d+ h nacidos|\d+ \d+ anos?|> \d+ anos?)\b/.test(normalized);
+}
+
+function markerForLabUnits(marker, units) {
+  const canonical = canonicalLabMarker(marker);
+  if (String(units || '').trim() !== '%') return canonical;
+  if (canonical === 'Calculated free testosterone (CFT)') return canonicalCatalogMarker(`${canonical} %`);
+  if (canonical === 'Bioavailable testosterone') return canonicalCatalogMarker(`${canonical} %`);
+  return canonical;
 }
 
 function isStructuredLabMarker(marker) {
@@ -382,7 +390,7 @@ export function parseLabLines(rawLines, filenameDate = '') {
       const result = parseIndentedResultLine(line);
       if (result && isMoreIndentedLine(pendingMarker, lineRecord) && matchingPdfStyle(pendingMarker, lineRecord) && !isReferenceAnnotationLine(line)) {
         for (const row of rowsFromIndentedResult(pendingMarker, lineRecord, reportDate)) {
-          row.marker = canonicalLabMarker(row.marker);
+          row.marker = markerForLabUnits(row.marker, row.units);
           const key = [normalizeMarkerText(row.marker), row.date, row.value, row.units.toLowerCase()].join('|');
           if (!seen.has(key)) { seen.add(key); rows.push(row); }
         }
@@ -394,7 +402,7 @@ export function parseLabLines(rawLines, filenameDate = '') {
     if (orphanMatch) {
       if (pendingMarker && isMoreIndentedLine(pendingMarker, lineRecord) && matchingPdfStyle(pendingMarker, lineRecord)) {
         for (const row of rowsFromOrphan(pendingMarker.text, orphanMatch, reportDate)) {
-          row.marker = canonicalLabMarker(row.marker);
+          row.marker = markerForLabUnits(row.marker, row.units);
           const key = [row.marker.toLowerCase(), row.date, row.value, row.units.toLowerCase()].join('|');
           if (!seen.has(key)) { seen.add(key); rows.push(row); }
         }
@@ -408,7 +416,7 @@ export function parseLabLines(rawLines, filenameDate = '') {
     const dated = parseDatedLabcorpLine(line, reportDate);
     if (dated) {
       for (const row of dated) {
-        row.marker = canonicalLabMarker(row.marker);
+        row.marker = markerForLabUnits(row.marker, row.units);
         const key = [row.marker.toLowerCase(), row.date, row.value, row.units.toLowerCase()].join('|');
         if (!seen.has(key)) { seen.add(key); rows.push(row); }
       }
@@ -419,7 +427,7 @@ export function parseLabLines(rawLines, filenameDate = '') {
     const candidates = candidate ? [candidate] : structured || [];
     for (const row of candidates) {
       if (!Number.isFinite(row.value)) continue;
-      row.marker = canonicalLabMarker(row.marker);
+      row.marker = markerForLabUnits(row.marker, row.units);
       const key = [row.marker.toLowerCase(), row.date, row.value, row.units.toLowerCase()].join('|');
       if (seen.has(key)) continue;
       seen.add(key);

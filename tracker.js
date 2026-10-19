@@ -2,7 +2,7 @@ import { Chess } from './chess-engine.js';
 import { interpretQuickUpdate } from './quick-update.js';
 import { renderAnalysis } from './analysis.js?v=2';
 import { WISDOM } from './wisdom.js';
-import { canonicalLabMarker, labMarkerIdentity, readPdfLabRows } from './lab-pdf.js?v=3';
+import { canonicalLabMarker, labMarkerIdentity, readPdfLabRows } from './lab-pdf.js?v=4';
 import { DEFAULT_LAB_CATEGORIES, catalogCategoryForMarker, catalogMarkerDefinition, defaultLabCategories, demographicReference, labUnitConversion, standardizeLabResult } from './lab-catalog.js';
 
 const STORAGE_KEY = 'thyroid-tracker-v2';
@@ -1613,7 +1613,7 @@ function openLabDashboard(marker) {
 function drawLabGraph() {
   const container = document.getElementById('labGraph');
   const days = document.getElementById('detailTimeFilter').value;
-  const values = withinTimeframe(data.labs.filter((lab) => markerReferenceKey(lab.marker) === markerReferenceKey(selectedLabMarker)), days).sort((a, b) => a.date.localeCompare(b.date));
+  const values = withinTimeframe(data.labs.filter((lab) => markerReferenceKey(lab.marker) === markerReferenceKey(selectedLabMarker) && Number.isFinite(Number(lab.value))), days).sort((a, b) => a.date.localeCompare(b.date));
   if (!values.length) { container.innerHTML = '<div class="empty-state">No results in this time period.</div>'; return; }
   const compactLandscape = window.matchMedia('(orientation: landscape) and (max-height: 600px)').matches;
   const width = 680, height = compactLandscape ? 125 : 280, pad = compactLandscape ? { left: 48, right: 18, top: 15, bottom: 28 } : { left: 54, right: 22, top: 25, bottom: 45 };
@@ -1690,7 +1690,7 @@ function csvNumber(value) {
   const text = String(value ?? '').trim().replace(/\s/g, '');
   if (!text || /^(?:-|—|n\/a|na|not\s+done|negative|positive)$/i.test(text)) return null;
   const normalized = text.includes(',') && !text.includes('.') ? text.replace(',', '.') : text.replace(/,/g, '');
-  const match = normalized.match(/[<>]?(-?\d+(?:\.\d+)?)/);
+  const match = normalized.match(/[<>≤≥]?(-?\d+(?:\.\d+)?)/);
   return match ? Number(match[1]) : null;
 }
 
@@ -1711,10 +1711,15 @@ function parseLabText(text) {
   const referenceIndex = headerIndex(referenceHeaders);
   const parsed = [];
   const addResult = (marker, date, rawValue, units = '', reference = '', sourceIndex = 0) => {
+    const rawText = String(rawValue ?? '').trim();
     const value = csvNumber(rawValue);
     const resultDate = csvDate(date);
-    if (!marker || !resultDate || value === null || !Number.isFinite(value)) return;
-    parsed.push({ id: uniqueId(`lab-csv-${sourceIndex}`), marker: canonicalUserLabMarker(canonicalLabMarker(marker)), date: resultDate, value, units: String(units || '').trim(), reference: String(reference || '').trim() });
+    const resultUnits = String(units || '').trim();
+    const qualitative = resultUnits.toLowerCase() === 'qualitative' && rawText && !/^(?:-|—|n\/a|na|not\s+done)$/i.test(rawText);
+    if (!marker || !resultDate || (value === null && !qualitative) || (value !== null && !Number.isFinite(value))) return;
+    const limit = rawText.match(/^\s*([<>≤≥])/);
+    const flag = limit ? (/[<≤]/.test(limit[1]) ? 'L' : 'H') : '';
+    parsed.push({ id: uniqueId(`lab-csv-${sourceIndex}`), marker: canonicalUserLabMarker(canonicalLabMarker(marker)), date: resultDate, value: qualitative ? rawText : value, units: resultUnits, reference: String(reference || '').trim(), flag, flagSource: flag ? 'report' : '' });
   };
 
   if (markerIndex >= 0 && dateIndex >= 0 && valueIndex >= 0) {
@@ -1874,7 +1879,7 @@ async function labFileFingerprint(file) {
 }
 
 function labResultDuplicateKey(lab) {
-  return [markerReferenceKey(lab.marker), lab.date, Number(lab.value), String(lab.units || '').trim().toLowerCase()].join('|');
+  return [markerReferenceKey(lab.marker), lab.date, String(lab.units || '').trim().toLowerCase()].join('|');
 }
 
 function commitImportedLabRows(rows, source, useProvidedReference = false) {
