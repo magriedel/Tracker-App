@@ -20,6 +20,7 @@
     <link rel="stylesheet" href="./analysis.css?v=2" />
     <link rel="stylesheet" href="./routine-edit.css?v=7" />
     <link rel="stylesheet" href="./calendar.css?v=1" />
+    <link rel="stylesheet" href="./research.css?v=1" />
     <link rel="stylesheet" href="./lab-pdf.css?v=28" />
     <link rel="stylesheet" href="./folders.css?v=1" />
     <title>Thyroid Tracker</title>
@@ -95,7 +96,9 @@
 
         <section class="screen" id="screen-research" role="tabpanel" aria-labelledby="tab-research" hidden>
           <div class="screen-heading compact-heading"><h2>Research</h2></div>
-          <form id="researchForm" class="research-form"><label class="field"><span>General topic</span><select id="researchTopic"><option value="(Graves disease OR Basedow disease) AND (thyroid antibodies OR TRAb OR TSI)">Graves' disease and antibodies</option><option value="Graves disease AND sleep">Graves' disease and sleep</option><option value="hyperthyroidism AND heart rate">Hyperthyroidism and heart rate</option><option value="Graves disease AND exercise">Graves' disease and exercise</option></select></label><button class="button secondary" type="submit">Refresh papers</button></form>
+          <form id="researchForm" class="research-form"><label class="field" for="researchTopic"><span>Search PubMed</span><input id="researchTopic" type="search" maxlength="250" placeholder="Enter any research question" autocomplete="off" /></label><button id="researchSearchButton" class="button secondary" type="submit">Search</button></form>
+          <p class="research-privacy">Searches go to PubMed. Suggestions are generated on this device from submitted check-ins, lab markers, and local patterns.</p>
+          <section class="research-suggestion-section" aria-labelledby="researchSuggestionsHeading"><h3 id="researchSuggestionsHeading">Suggested searches</h3><div id="researchSuggestions" class="research-suggestions"></div></section>
           <div id="researchResults" class="research-results"></div>
           <div id="aiReviewArea" class="ai-review-area" hidden><button id="aiReviewButton" class="button secondary" type="button">Compare papers with ChatGPT</button></div>
           <section class="local-patterns"><div class="section-rule"><h3>Your patterns</h3><span>On this device</span></div><div id="localCorrelations" class="correlation-list"></div></section>
@@ -116,7 +119,7 @@
       <dialog id="labCategoryMenu" class="routine-group-menu"><div class="dialog-heading"><div><p class="eyebrow">Biomarker category</p><h2 id="labCategoryMenuTitle">Category</h2></div><button id="closeLabCategoryMenu" class="icon-button" type="button" aria-label="Close category menu">Done</button></div><div class="routine-group-menu-actions"><button id="renameLabCategory" class="button secondary" type="button">Rename category</button><button id="deleteLabCategory" class="button danger-button" type="button">Delete category</button></div></dialog>
       <div id="toast" class="toast" role="status" aria-live="polite"></div>
     </div>
-    <script type="module" src="./tracker.js?v=42"></script>
+    <script type="module" src="./tracker.js?v=43"></script>
     <script type="module" src="./folders.js?v=1"></script>
   </body>
 </html>

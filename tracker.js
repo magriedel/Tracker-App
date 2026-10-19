@@ -104,7 +104,6 @@ let recognition = null;
 let toastTimer;
 let selectedSquare = null;
 let currentPublicPapers = [];
-let researchHasLoaded = false;
 let labPortraitTextScale = Math.min(1, Math.max(0.65, Number(localStorage.getItem('thyroid-tracker-lab-text-scale')) || 0.8));
 let activeRoutineGroup = TIME_GROUPS[0][0];
 let activeLabCategory = 'Thyroid';
@@ -2052,8 +2051,12 @@ function setupVoice() {
 }
 
 async function searchPapers(event) {
-  event.preventDefault(); const query = document.getElementById('researchTopic').value; const results = document.getElementById('researchResults');
-  if (!query) return;
+  event.preventDefault(); const query = document.getElementById('researchTopic').value.trim(); const results = document.getElementById('researchResults');
+  if (!query) { results.innerHTML = '<p class="empty-state">Enter a search or choose a suggestion.</p>'; return; }
+  const button = document.getElementById('researchSearchButton');
+  button.disabled = true;
+  currentPublicPapers = [];
+  document.getElementById('aiReviewArea').hidden = true;
   results.innerHTML = '<p class="empty-state">Searching PubMed. Your search terms are sent to NCBI; tracker data is not.</p>';
   try {
     const base = 'https://eutils.ncbi.nlm.nih.gov/entrez/eutils/';
@@ -2067,34 +2070,64 @@ async function searchPapers(event) {
     document.getElementById('aiReviewArea').hidden = false;
     results.innerHTML = ids.map((id) => { const article = summary.result[id]; const authors = article.authors?.slice(0, 3).map((author) => author.name).join(', ') || 'Authors not listed'; return `<article class="paper-row"><p class="paper-date">${escapeHtml(article.pubdate || 'Date unknown')} · ${escapeHtml(article.fulljournalname || article.source || 'PubMed')}</p><h3><a href="https://pubmed.ncbi.nlm.nih.gov/${encodeURIComponent(id)}/" target="_blank" rel="noreferrer">${escapeHtml(article.title || 'Untitled paper')}</a></h3><p>${escapeHtml(authors)}${article.authors?.length > 3 ? ' et al.' : ''}</p><span class="paper-id">PMID ${escapeHtml(id)}</span></article>`; }).join('');
   } catch { results.innerHTML = '<p class="empty-state">Could not reach PubMed. Check your connection and try again. Research search needs internet access.</p>'; }
+  finally { button.disabled = false; }
 }
 
-function chooseResearchTopic() {
-  const topic = document.getElementById('researchTopic');
-  const submitted = Object.entries(data.days).flatMap(([, day]) => {
-    if (day.submitted) return [day.submitted];
-    const history = day.parts?.checkin; const latest = Array.isArray(history) ? history[history.length - 1]?.entry : history?.entry;
-    return latest ? [latest] : [];
+function researchEntries() {
+  return Object.entries(data.days).flatMap(([date, day]) => {
+    if (day.submitted) return [{ date, entry: day.submitted }];
+    const history = day.parts?.checkin;
+    const latest = Array.isArray(history) ? history[history.length - 1]?.entry : history?.entry;
+    return latest ? [{ date, entry: latest }] : [];
+  }).sort((a, b) => a.date.localeCompare(b.date)).slice(-14);
+}
+
+function renderResearchSuggestions() {
+  renderLocalCorrelations();
+  const suggestions = [];
+  const seen = new Set();
+  const add = (label, query, type) => {
+    const key = query.toLowerCase();
+    if (!query || seen.has(key) || suggestions.length >= 8) return;
+    seen.add(key); suggestions.push({ label, query, type });
+  };
+  document.querySelectorAll('#localCorrelations .correlation-row').forEach((row) => {
+    if (suggestions.filter((item) => item.type === 'Pattern').length >= 2) return;
+    const item = row.querySelector('strong')?.textContent?.trim();
+    const measure = row.querySelector('span')?.textContent?.replace(/^with\s+/i, '').trim();
+    if (item && measure) add(`${item} and ${measure}`, `"${item}" AND "${measure}" AND (thyroid OR Graves disease)`, 'Pattern');
   });
-  const recent = submitted.slice(-14);
-  const averages = [...allSymptoms(), 'Sleep quality'].map((name) => {
-    const key = name.toLowerCase(); const values = recent.map((entry) => Number(entry.symptoms?.[key])).filter(Number.isFinite);
-    const metricValues = key === 'sleep quality' ? recent.map((entry) => Number(entry.sleepQuality)).filter(Number.isFinite) : values;
-    return { key, average: metricValues.length ? metricValues.reduce((sum, value) => sum + value, 0) / metricValues.length : 0, coverage: metricValues.length };
+
+  const entries = researchEntries();
+  const symptomScores = allSymptoms().map((name) => {
+    const key = name.toLowerCase();
+    const values = entries.map(({ entry }) => Number(entry.symptoms?.[key])).filter(Number.isFinite);
+    return { name, average: values.length ? values.reduce((sum, value) => sum + value, 0) / values.length : 0, count: values.length };
+  }).filter((item) => item.count >= 2 && item.average > 0).sort((a, b) => b.average - a.average);
+  symptomScores.slice(0, 2).forEach(({ name }) => add(`${name} and thyroid disease`, `"${name}" AND (Graves disease OR hyperthyroidism)`, 'Check-in'));
+
+  const latestLabs = new Map();
+  [...(data.labs || [])].sort((a, b) => String(b.date).localeCompare(String(a.date))).forEach((lab) => {
+    const marker = canonicalUserLabMarker(lab.marker);
+    if (marker && !latestLabs.has(marker)) latestLabs.set(marker, lab);
   });
-  const symptom = averages.filter((item) => item.coverage && item.average > 0).sort((a, b) => b.average - a.average)[0];
-  let label = 'Graves disease AND thyroid antibodies';
-  if (symptom?.key === 'palpitations') label = 'hyperthyroidism AND heart rate';
-  else if (symptom?.key === 'sleep quality' || recent.some((entry) => entry.health?.sleepMinutes)) label = 'Graves disease AND sleep';
-  else if (symptom?.key === 'digestion' || recent.some((entry) => entry.stoolEvents?.some((item) => item.form))) label = 'Graves disease AND gut microbiome';
-  else if (symptom?.key === 'fatigue' || recent.some((entry) => entry.health?.exerciseMinutes)) label = 'Graves disease AND exercise fatigue';
-  else if (data.labs.some((lab) => /t3|t4|tsh/i.test(lab.marker))) label = 'Graves disease AND thyroid antibodies';
-  const option = [...topic.options].find((candidate) => candidate.value.toLowerCase() === label.toLowerCase() || candidate.textContent.toLowerCase() === label.toLowerCase());
-  if (option) topic.value = option.value;
-  else {
-    const dynamic = document.createElement('option'); dynamic.value = label; dynamic.textContent = label.replace(/ AND /g, ' · '); topic.append(dynamic); topic.value = label;
-  }
-  return label;
+  const labs = [...latestLabs.entries()].sort(([, a], [, b]) => Number(Boolean(b.flag)) - Number(Boolean(a.flag)) || String(b.date).localeCompare(String(a.date)));
+  labs.slice(0, 3).forEach(([marker, lab]) => {
+    const flagged = lab.flag ? ' · flagged lab' : ' · lab';
+    add(`${marker} and thyroid function${flagged}`, `"${marker}" AND (thyroid function OR Graves disease OR hyperthyroidism)`, 'Lab');
+  });
+
+  [
+    ['Graves disease and thyroid antibodies', '(Graves disease OR Basedow disease) AND (thyroid antibodies OR TRAb OR TSI)'],
+    ['Sleep and thyroid function', '(Graves disease OR hyperthyroidism) AND sleep'],
+    ['Hyperthyroidism and heart rate', 'hyperthyroidism AND (heart rate OR arrhythmia)'],
+    ['Exercise tolerance and Graves disease', '(Graves disease OR hyperthyroidism) AND exercise tolerance'],
+    ['Autoimmune thyroid disease and gut health', 'autoimmune thyroid disease AND gut microbiome'],
+    ['Thyroid hormone and bone health', 'thyroid hormone AND bone density'],
+    ['Vitamin D and autoimmune thyroid disease', 'vitamin D AND autoimmune thyroid disease']
+  ].forEach(([label, query]) => add(label, query, 'Topic'));
+
+  document.getElementById('researchSuggestions').innerHTML = suggestions.map((item) => `<button class="research-suggestion" type="button" data-research-query="${escapeHtml(item.query)}"><span>${escapeHtml(item.label)}</span><small>${escapeHtml(item.type)}</small></button>`).join('');
 }
 
 function showScreen(name) {
@@ -2103,7 +2136,7 @@ function showScreen(name) {
   document.querySelectorAll('.screen').forEach((screen) => { const active = screen.id === `screen-${name}`; screen.hidden = !active; screen.classList.toggle('active', active); });
   if (name === 'labs') renderLabs();
   if (name === 'analysis') renderAnalysis(document.getElementById('analysisRoot'), { days: data.days, labs: data.labs || [], healthByDate: data.healthByDate || {}, symptoms: allSymptoms() });
-  if (name === 'research') { researchHasLoaded = true; chooseResearchTopic(); searchPapers({ preventDefault() {} }); }
+  if (name === 'research') renderResearchSuggestions();
 }
 function setupTabs() {
   document.querySelectorAll('[data-screen]').forEach((button) => button.addEventListener('click', () => showScreen(button.dataset.screen)));
@@ -2174,6 +2207,12 @@ document.getElementById('saveDesiredRange').addEventListener('click', saveMarker
 document.getElementById('closeLabDialog').addEventListener('click', () => document.getElementById('labDetailDialog').close());
 document.getElementById('labDetailDialog').addEventListener('click', (event) => { if (event.target === event.currentTarget) event.currentTarget.close(); });
 document.getElementById('researchForm').addEventListener('submit', searchPapers);
+document.getElementById('researchSuggestions').addEventListener('click', (event) => {
+  const suggestion = event.target.closest('[data-research-query]');
+  if (!suggestion) return;
+  document.getElementById('researchTopic').value = suggestion.dataset.researchQuery;
+  document.getElementById('researchForm').requestSubmit();
+});
 document.getElementById('aiReviewButton').addEventListener('click', () => {
   if (!currentPublicPapers.length) return;
   const query = document.getElementById('researchTopic').value;
