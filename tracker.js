@@ -966,7 +966,8 @@ function openDatePicker() {
 }
 function setDate(date) {
   if (pendingQuickUpdate) cancelQuickUpdate();
-  activeRoutineGroup = routineGroups()[0];
+  saveData();
+  if (!routineGroups().includes(activeRoutineGroup)) activeRoutineGroup = routineGroups()[0];
   activeDate = date || today();
   getDay();
   if (data.healthByDate?.[activeDate]) draft().health = data.healthByDate[activeDate];
