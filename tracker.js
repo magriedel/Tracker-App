@@ -1,6 +1,6 @@
 import { Chess } from './chess-engine.js';
 import { interpretQuickUpdate } from './quick-update.js';
-import { renderAnalysis } from './analysis.js?v=3';
+import { renderAnalysis } from './analysis.js?v=4';
 import { WISDOM } from './wisdom.js';
 import { canonicalLabMarker, labMarkerIdentity, readPdfLabRows } from './lab-pdf.js?v=5';
 import { DEFAULT_LAB_CATEGORIES, catalogCategoryForMarker, catalogMarkerDefinition, defaultLabCategories, demographicReference, labUnitConversion, standardizeLabResult } from './lab-catalog.js';
@@ -883,7 +883,7 @@ function parseAppleHealthXml(xmlText) {
   const xml = new DOMParser().parseFromString(xmlText, 'application/xml');
   if (xml.querySelector('parsererror')) throw new Error('This does not look like an Apple Health XML export.');
   const summaries = {};
-  const bucket = (key) => summaries[key] || (summaries[key] = { heartRates: [], steps: 0, sleepIntervals: [], exerciseMinutes: 0, workouts: 0 });
+  const bucket = (key) => summaries[key] || (summaries[key] = { heartRates: [], steps: 0, sleepIntervals: [], exerciseMinutes: 0, workouts: 0, workoutsByType: {} });
   xml.querySelectorAll('Record').forEach((record) => {
     const key = dateKey(record.getAttribute('startDate'));
     if (!key) return;
@@ -899,7 +899,16 @@ function parseAppleHealthXml(xmlText) {
     const key = dateKey(workout.getAttribute('startDate')); const duration = Number(workout.getAttribute('duration'));
     const unit = (workout.getAttribute('durationUnit') || 'min').toLowerCase();
     const minutes = /sec/.test(unit) ? duration / 60 : /hour/.test(unit) ? duration * 60 : duration;
-    if (key && Number.isFinite(minutes)) { bucket(key).exerciseMinutes += minutes; bucket(key).workouts += 1; }
+    if (key && Number.isFinite(minutes)) {
+      const summary = bucket(key);
+      const rawType = workout.getAttribute('workoutActivityType') || 'HKWorkoutActivityTypeOther';
+      const type = rawType.replace(/^HKWorkoutActivityType/, '').replace(/([a-z])([A-Z])/g, '$1 $2').replace(/Sports$/, '').trim() || 'Other';
+      const sessions = Math.max(1, Number(workout.getAttribute('numberOfSessions')) || 1);
+      summary.exerciseMinutes += minutes; summary.workouts += sessions;
+      summary.workoutsByType[type] ||= { exerciseMinutes: 0, workouts: 0 };
+      summary.workoutsByType[type].exerciseMinutes += minutes;
+      summary.workoutsByType[type].workouts += sessions;
+    }
   });
   Object.values(summaries).forEach((summary) => {
     summary.averageHeartRate = summary.heartRates.length ? summary.heartRates.reduce((sum, value) => sum + value, 0) / summary.heartRates.length : null;
@@ -919,7 +928,8 @@ function renderHealthSummary() {
   if (!container) return;
   if (!dataForDay) { container.innerHTML = ''; return; }
   draft().health = dataForDay;
-  container.innerHTML = `<span>${dataForDay.sleepMinutes ? `${(dataForDay.sleepMinutes / 60).toFixed(1)} h sleep` : 'Sleep not found'}</span><span>${dataForDay.averageHeartRate ? `${Math.round(dataForDay.averageHeartRate)} bpm average` : 'Heart rate not found'}</span><span>${dataForDay.steps ? `${Math.round(dataForDay.steps).toLocaleString()} steps` : ''}</span><span>${dataForDay.exerciseMinutes ? `${Math.round(dataForDay.exerciseMinutes)} exercise min · ${dataForDay.workouts} workouts` : ''}</span>`;
+  const activitySummary = Object.entries(dataForDay.workoutsByType || {}).map(([type, values]) => `${type}: ${Math.round(values.exerciseMinutes)} min · ${values.workouts} workout${values.workouts === 1 ? '' : 's'}`);
+  container.innerHTML = `<span>${dataForDay.sleepMinutes ? `${(dataForDay.sleepMinutes / 60).toFixed(1)} h sleep` : 'Sleep not found'}</span><span>${dataForDay.averageHeartRate ? `${Math.round(dataForDay.averageHeartRate)} bpm average` : 'Heart rate not found'}</span><span>${dataForDay.steps ? `${Math.round(dataForDay.steps).toLocaleString()} steps` : ''}</span><span>${dataForDay.exerciseMinutes ? `${Math.round(dataForDay.exerciseMinutes)} exercise min · ${dataForDay.workouts} workouts` : ''}</span>${activitySummary.map((summary) => `<span>${escapeHtml(summary)}</span>`).join('')}`;
 }
 
 function importAppleHealth(file) {

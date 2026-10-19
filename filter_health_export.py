@@ -32,7 +32,7 @@ def filter_export(source_path, destination_path, start, end):
     iterator = ET.iterparse(source_path, events=("start", "end"))
     _, root = next(iterator)
     root_tag = root.tag
-    summaries = defaultdict(lambda: {"heart_rate_sum": 0.0, "heart_rate_count": 0, "steps": 0.0, "sleep": [], "workouts": []})
+    summaries = defaultdict(lambda: {"heart_rate_sum": 0.0, "heart_rate_count": 0, "steps": 0.0, "sleep": [], "workouts": defaultdict(lambda: {"minutes": 0.0, "sessions": 0})})
     counts = {"heart_rate": 0, "steps": 0, "sleep_intervals": 0, "workouts": 0, "ignored_records": 0}
     stack = [root]
 
@@ -42,7 +42,7 @@ def filter_export(source_path, destination_path, start, end):
             return False
         day = summaries[record_date.isoformat()]
         kind = record.get("type", "")
-        if kind == "HKCategoryTypeIdentifierSleepAnalysis" and record.get("value", "").startswith("Asleep"):
+        if kind == "HKCategoryTypeIdentifierSleepAnalysis" and "Asleep" in record.get("value", ""):
             try:
                 start_time = datetime.fromisoformat(record.get("startDate", "")[:19])
                 end_time = datetime.fromisoformat(record.get("endDate", "")[:19])
@@ -95,7 +95,10 @@ def filter_export(source_path, destination_path, start, end):
                         elif "hour" in unit:
                             duration *= 60
                         if duration > 0:
-                            summaries[item_date.isoformat()]["workouts"].append(duration)
+                            activity = element.get("workoutActivityType", "HKWorkoutActivityTypeOther")
+                            workout_summary = summaries[item_date.isoformat()]["workouts"][activity]
+                            workout_summary["minutes"] += duration
+                            workout_summary["sessions"] += int(element.get("numberOfSessions", "1") or 1)
                             counts["workouts"] += 1
                     root.remove(element)
                 elif name in {"ExportDate", "Me"}:
@@ -125,8 +128,8 @@ def filter_export(source_path, destination_path, start, end):
                 minutes = sum(summary["sleep"])
                 record = ET.Element("Record", {"type": "HKCategoryTypeIdentifierSleepAnalysis", "sourceName": "Thyroid Tracker daily summary", "startDate": f"{day_key}T00:00:00", "endDate": f"{day_key}T{int(minutes // 60):02d}:{int(minutes % 60):02d}:00", "value": "AsleepUnspecified"})
                 output.write(ET.tostring(record, encoding="unicode"))
-            for duration in summary["workouts"]:
-                workout = ET.Element("Workout", {"workoutActivityType": "HKWorkoutActivityTypeOther", "duration": f"{duration:.6f}", "durationUnit": "min", "totalDistance": "0", "totalDistanceUnit": "km", "totalEnergyBurned": "0", "totalEnergyBurnedUnit": "kcal", "sourceName": "Thyroid Tracker daily summary", "startDate": timestamp, "endDate": timestamp})
+            for activity, workout_summary in summary["workouts"].items():
+                workout = ET.Element("Workout", {"workoutActivityType": activity, "duration": f"{workout_summary['minutes']:.6f}", "durationUnit": "min", "numberOfSessions": str(workout_summary['sessions']), "totalDistance": "0", "totalDistanceUnit": "km", "totalEnergyBurned": "0", "totalEnergyBurnedUnit": "kcal", "sourceName": "Thyroid Tracker daily summary", "startDate": timestamp, "endDate": timestamp})
                 output.write(ET.tostring(workout, encoding="unicode"))
         output.write(f"</{root_tag}>\n")
     return counts, len(summaries)

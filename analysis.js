@@ -53,6 +53,8 @@ function buildMetrics(ctx) {
     { name: 'Watch steps', get: (entry) => num(entry.health?.steps) },
     { name: 'Watch exercise (min)', get: (entry) => num(entry.health?.exerciseMinutes) }
   ];
+  const workoutTypes = [...new Set(ctx.healthByDate ? Object.values(ctx.healthByDate).flatMap((summary) => Object.keys(summary.workoutsByType || {})) : [])];
+  workoutTypes.forEach((type) => metrics.push({ name: `Watch ${type} (min)`, get: (entry) => num(entry.health?.workoutsByType?.[type]?.exerciseMinutes) }));
   [...new Set(ctx.labs.map((lab) => canonicalLabMarker(lab.marker)))].forEach((marker) => {
     const values = ctx.labs.filter((lab) => labMarkerIdentity(lab.marker) === labMarkerIdentity(marker));
     metrics.push({ name: `${marker} (lab)`, lab: true, get: (entry, date) => {
