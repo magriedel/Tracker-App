@@ -2,8 +2,7 @@ import { Chess } from './chess-engine.js';
 import { interpretQuickUpdate } from './quick-update.js';
 import { renderAnalysis } from './analysis.js?v=2';
 import { WISDOM } from './wisdom.js';
-import { canonicalLabMarker, labMarkerIdentity, readPdfLabRows } from './lab-pdf.js';
-import { canonicalLabMarker, labMarkerIdentity, readPdfLabRows } from './lab-pdf.js?v=2';
+import { canonicalLabMarker, labMarkerIdentity, readPdfLabRows } from './lab-pdf.js?v=3';
 import { DEFAULT_LAB_CATEGORIES, catalogCategoryForMarker, catalogMarkerDefinition, defaultLabCategories, demographicReference, labUnitConversion, standardizeLabResult } from './lab-catalog.js';
 
 const STORAGE_KEY = 'thyroid-tracker-v2';
