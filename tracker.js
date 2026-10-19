@@ -1,6 +1,6 @@
 import { Chess } from './chess-engine.js';
 import { interpretQuickUpdate } from './quick-update.js';
-import { renderAnalysis } from './analysis.js?v=4';
+import { renderAnalysis } from './analysis.js?v=5';
 import { WISDOM } from './wisdom.js';
 import { canonicalLabMarker, labMarkerIdentity, readPdfLabRows } from './lab-pdf.js?v=5';
 import { DEFAULT_LAB_CATEGORIES, catalogCategoryForMarker, catalogMarkerDefinition, defaultLabCategories, demographicReference, labUnitConversion, standardizeLabResult } from './lab-catalog.js';
@@ -883,17 +883,29 @@ function parseAppleHealthXml(xmlText) {
   const xml = new DOMParser().parseFromString(xmlText, 'application/xml');
   if (xml.querySelector('parsererror')) throw new Error('This does not look like an Apple Health XML export.');
   const summaries = {};
-  const bucket = (key) => summaries[key] || (summaries[key] = { heartRates: [], steps: 0, sleepIntervals: [], exerciseMinutes: 0, workouts: 0, workoutsByType: {} });
+  const bucket = (key) => summaries[key] || (summaries[key] = { heartRates: [], steps: 0, sleepIntervals: [], exerciseMinutes: 0, workouts: 0, workoutsByType: {}, metrics: {} });
+  const sumTypes = new Set(['StepCount', 'DistanceWalkingRunning', 'DistanceCycling', 'DistanceSwimming', 'FlightsClimbed', 'ActiveEnergyBurned', 'BasalEnergyBurned', 'AppleExerciseTime', 'AppleStandTime', 'PushCount', 'SwimmingStrokeCount', 'StandHour']);
   xml.querySelectorAll('Record').forEach((record) => {
     const key = dateKey(record.getAttribute('startDate'));
     if (!key) return;
-    const type = record.getAttribute('type') || ''; const value = Number(record.getAttribute('value'));
-    if (type === 'HKQuantityTypeIdentifierHeartRate' && Number.isFinite(value)) bucket(key).heartRates.push(value);
-    else if (type === 'HKQuantityTypeIdentifierStepCount' && Number.isFinite(value)) bucket(key).steps += value;
-    else if (type === 'HKCategoryTypeIdentifierSleepAnalysis' && /Asleep(Core|Deep|REM|Unspecified)/.test(record.getAttribute('value') || '')) {
+    const type = record.getAttribute('type') || '';
+    const rawValue = record.getAttribute('value') || '';
+    if (type === 'HKCategoryTypeIdentifierSleepAnalysis' && /Asleep/.test(rawValue)) {
       const start = new Date(record.getAttribute('startDate')).getTime(); const end = new Date(record.getAttribute('endDate')).getTime();
       if (Number.isFinite(start) && Number.isFinite(end) && end > start) bucket(key).sleepIntervals.push([start, end]);
+      return;
     }
+    if (!type.startsWith('HKQuantityTypeIdentifier')) return;
+    let value = Number(rawValue);
+    if (!Number.isFinite(value)) return;
+    const shortType = type.slice('HKQuantityTypeIdentifier'.length);
+    const summary = bucket(key);
+    const metric = summary.metrics[shortType] || (summary.metrics[shortType] = { value: 0, count: 0, unit: record.getAttribute('unit') || '', aggregation: sumTypes.has(shortType) ? 'sum' : 'average' });
+    if (shortType === 'OxygenSaturation' && metric.unit === '%' && value > 0 && value <= 1) value *= 100;
+    metric.value += value;
+    metric.count += 1;
+    if (shortType === 'HeartRate') summary.heartRates.push(value);
+    if (shortType === 'StepCount') summary.steps += value;
   });
   xml.querySelectorAll('Workout').forEach((workout) => {
     const key = dateKey(workout.getAttribute('startDate')); const duration = Number(workout.getAttribute('duration'));
@@ -902,10 +914,11 @@ function parseAppleHealthXml(xmlText) {
     if (key && Number.isFinite(minutes)) {
       const summary = bucket(key);
       const rawType = workout.getAttribute('workoutActivityType') || 'HKWorkoutActivityTypeOther';
-      const type = rawType.replace(/^HKWorkoutActivityType/, '').replace(/([a-z])([A-Z])/g, '$1 $2').replace(/Sports$/, '').trim() || 'Other';
+      const activityType = rawType.replace(/^HKWorkoutActivityType/, '') || 'Other';
+      const type = activityType.replace(/([a-z])([A-Z])/g, '$1 $2').replace(/Sports$/, '').trim() || 'Other';
       const sessions = Math.max(1, Number(workout.getAttribute('numberOfSessions')) || 1);
       summary.exerciseMinutes += minutes; summary.workouts += sessions;
-      summary.workoutsByType[type] ||= { exerciseMinutes: 0, workouts: 0 };
+      summary.workoutsByType[type] ||= { activityType, exerciseMinutes: 0, workouts: 0 };
       summary.workoutsByType[type].exerciseMinutes += minutes;
       summary.workoutsByType[type].workouts += sessions;
     }
@@ -917,6 +930,10 @@ function parseAppleHealthXml(xmlText) {
     summary.sleepIntervals.forEach(([start, end]) => { if (intervalStart === null) { intervalStart = start; intervalEnd = end; } else if (start <= intervalEnd) intervalEnd = Math.max(intervalEnd, end); else { totalMilliseconds += intervalEnd - intervalStart; intervalStart = start; intervalEnd = end; } });
     if (intervalStart !== null) totalMilliseconds += intervalEnd - intervalStart;
     summary.sleepMinutes = totalMilliseconds / 60000;
+    Object.entries(summary.metrics).forEach(([type, metric]) => {
+      metric.value = metric.aggregation === 'sum' ? metric.value : metric.value / metric.count;
+      if (type === 'HeartRate') summary.averageHeartRate = metric.value;
+    });
     delete summary.heartRates; delete summary.sleepIntervals;
   });
   return summaries;
@@ -928,8 +945,13 @@ function renderHealthSummary() {
   if (!container) return;
   if (!dataForDay) { container.innerHTML = ''; return; }
   draft().health = dataForDay;
+  const metricLabels = { HeartRateVariabilitySDNN: 'HRV (SDNN)', RestingHeartRate: 'Resting heart rate', OxygenSaturation: 'Blood oxygen', RespiratoryRate: 'Respiratory rate', WalkingHeartRateAverage: 'Walking heart rate', BodyTemperature: 'Body temperature', BasalBodyTemperature: 'Basal body temperature', AppleSleepingWristTemperature: 'Wrist temperature', VO2Max: 'VO2 max', BloodGlucose: 'Blood glucose', BodyMass: 'Body weight', BodyMassIndex: 'BMI', BodyFatPercentage: 'Body fat', ActiveEnergyBurned: 'Active energy', BasalEnergyBurned: 'Basal energy', DistanceWalkingRunning: 'Walking/running distance', DistanceCycling: 'Cycling distance', DistanceSwimming: 'Swimming distance', FlightsClimbed: 'Flights climbed', AppleExerciseTime: 'Exercise time', AppleStandTime: 'Stand time', PushCount: 'Pushes', SwimmingStrokeCount: 'Swimming strokes', StandHour: 'Stand hours', StepCount: 'Steps', HeartRate: 'Heart rate' };
+  const metrics = Object.entries(dataForDay.metrics || {}).filter(([name]) => !['HeartRate', 'StepCount'].includes(name)).map(([name, metric]) => {
+    const label = metricLabels[name] || name.replace(/([a-z])([A-Z])/g, '$1 $2');
+    return `${label}: ${Number(metric.value).toLocaleString(undefined, { maximumFractionDigits: 2 })}${metric.unit ? ` ${metric.unit}` : ''}`;
+  });
   const activitySummary = Object.entries(dataForDay.workoutsByType || {}).map(([type, values]) => `${type}: ${Math.round(values.exerciseMinutes)} min · ${values.workouts} workout${values.workouts === 1 ? '' : 's'}`);
-  container.innerHTML = `<span>${dataForDay.sleepMinutes ? `${(dataForDay.sleepMinutes / 60).toFixed(1)} h sleep` : 'Sleep not found'}</span><span>${dataForDay.averageHeartRate ? `${Math.round(dataForDay.averageHeartRate)} bpm average` : 'Heart rate not found'}</span><span>${dataForDay.steps ? `${Math.round(dataForDay.steps).toLocaleString()} steps` : ''}</span><span>${dataForDay.exerciseMinutes ? `${Math.round(dataForDay.exerciseMinutes)} exercise min · ${dataForDay.workouts} workouts` : ''}</span>${activitySummary.map((summary) => `<span>${escapeHtml(summary)}</span>`).join('')}`;
+  container.innerHTML = `<span>${dataForDay.sleepMinutes ? `${(dataForDay.sleepMinutes / 60).toFixed(1)} h sleep` : 'Sleep not found'}</span><span>${dataForDay.averageHeartRate ? `${Math.round(dataForDay.averageHeartRate)} bpm average heart rate` : 'Heart rate not found'}</span><span>${dataForDay.steps ? `${Math.round(dataForDay.steps).toLocaleString()} steps` : ''}</span><span>${dataForDay.exerciseMinutes ? `${Math.round(dataForDay.exerciseMinutes)} exercise min · ${dataForDay.workouts} workouts` : ''}</span>${metrics.map((metric) => `<span>${escapeHtml(metric)}</span>`).join('')}${activitySummary.map((summary) => `<span>${escapeHtml(summary)}</span>`).join('')}`;
 }
 
 function importAppleHealth(file) {

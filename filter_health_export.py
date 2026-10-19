@@ -3,6 +3,8 @@
 
 from datetime import date, datetime
 from collections import defaultdict
+import argparse
+import os
 import tkinter as tk
 from tkinter import filedialog, messagebox, simpledialog
 import xml.etree.ElementTree as ET
@@ -32,8 +34,22 @@ def filter_export(source_path, destination_path, start, end):
     iterator = ET.iterparse(source_path, events=("start", "end"))
     _, root = next(iterator)
     root_tag = root.tag
-    summaries = defaultdict(lambda: {"heart_rate_sum": 0.0, "heart_rate_count": 0, "steps": 0.0, "sleep": [], "workouts": defaultdict(lambda: {"minutes": 0.0, "sessions": 0})})
-    counts = {"heart_rate": 0, "steps": 0, "sleep_intervals": 0, "workouts": 0, "ignored_records": 0}
+    summaries = defaultdict(lambda: {"quantities": defaultdict(lambda: {"sum": 0.0, "count": 0, "unit": ""}), "sleep": [], "workouts": defaultdict(lambda: {"minutes": 0.0, "sessions": 0})})
+    counts = {"quantity_samples": 0, "sleep_intervals": 0, "workouts": 0, "ignored_records": 0}
+    sum_types = {
+        "HKQuantityTypeIdentifierStepCount",
+        "HKQuantityTypeIdentifierDistanceWalkingRunning",
+        "HKQuantityTypeIdentifierDistanceCycling",
+        "HKQuantityTypeIdentifierDistanceSwimming",
+        "HKQuantityTypeIdentifierFlightsClimbed",
+        "HKQuantityTypeIdentifierActiveEnergyBurned",
+        "HKQuantityTypeIdentifierBasalEnergyBurned",
+        "HKQuantityTypeIdentifierAppleExerciseTime",
+        "HKQuantityTypeIdentifierAppleStandTime",
+        "HKQuantityTypeIdentifierPushCount",
+        "HKQuantityTypeIdentifierSwimmingStrokeCount",
+        "HKQuantityTypeIdentifierStandHour",
+    }
     stack = [root]
 
     def add_record(record):
@@ -58,16 +74,14 @@ def filter_export(source_path, destination_path, start, end):
             value = float(record.get("value", ""))
         except ValueError:
             return False
-        if kind == "HKQuantityTypeIdentifierHeartRate":
-            day["heart_rate_sum"] += value
-            day["heart_rate_count"] += 1
-            counts["heart_rate"] += 1
-            return True
-        if kind == "HKQuantityTypeIdentifierStepCount":
-            day["steps"] += value
-            counts["steps"] += 1
-            return True
-        return False
+        if not kind.startswith("HKQuantityTypeIdentifier"):
+            return False
+        metric = day["quantities"][kind]
+        metric["sum"] += value
+        metric["count"] += 1
+        metric["unit"] = record.get("unit", metric["unit"])
+        counts["quantity_samples"] += 1
+        return True
 
     with open(destination_path, "w", encoding="utf-8", newline="") as output:
         for event, element in iterator:
@@ -117,12 +131,12 @@ def filter_export(source_path, destination_path, start, end):
                 output.write(ET.tostring(child, encoding="unicode"))
         for day_key, summary in sorted(summaries.items()):
             timestamp = f"{day_key}T12:00:00"
-            if summary["heart_rate_count"]:
-                average = summary["heart_rate_sum"] / summary["heart_rate_count"]
-                record = ET.Element("Record", {"type": "HKQuantityTypeIdentifierHeartRate", "sourceName": "Thyroid Tracker daily summary", "unit": "count/min", "startDate": timestamp, "endDate": timestamp, "value": f"{average:.6f}"})
-                output.write(ET.tostring(record, encoding="unicode"))
-            if summary["steps"]:
-                record = ET.Element("Record", {"type": "HKQuantityTypeIdentifierStepCount", "sourceName": "Thyroid Tracker daily summary", "unit": "count", "startDate": timestamp, "endDate": timestamp, "value": f"{summary['steps']:.6f}"})
+            for kind, metric in summary["quantities"].items():
+                if kind in sum_types:
+                    value = metric["sum"]
+                else:
+                    value = metric["sum"] / metric["count"]
+                record = ET.Element("Record", {"type": kind, "sourceName": "Thyroid Tracker daily summary", "unit": metric["unit"], "startDate": timestamp, "endDate": timestamp, "value": f"{value:.6f}"})
                 output.write(ET.tostring(record, encoding="unicode"))
             if summary["sleep"]:
                 minutes = sum(summary["sleep"])
@@ -136,6 +150,34 @@ def filter_export(source_path, destination_path, start, end):
 
 
 def main():
+    parser = argparse.ArgumentParser(description="Filter and condense an Apple Health export locally.")
+    parser.add_argument("--input", help="Path to the original Apple Health export.xml")
+    parser.add_argument("--start", help="Inclusive first date (YYYY-MM-DD)")
+    parser.add_argument("--end", help="Inclusive last date (YYYY-MM-DD)")
+    parser.add_argument("--output", help="Path for the filtered XML output")
+    args = parser.parse_args()
+
+    if any((args.input, args.start, args.end, args.output)):
+        if not all((args.input, args.start, args.end, args.output)):
+            parser.error("--input, --start, --end and --output must be provided together")
+        try:
+            start = date.fromisoformat(args.start)
+            end = date.fromisoformat(args.end)
+            if start > end:
+                parser.error("--start must be on or before --end")
+            counts, day_count = filter_export(args.input, args.output, start, end)
+        except (OSError, ET.ParseError, ValueError) as error:
+            parser.exit(1, f"Could not filter export: {error}\n")
+        size_mb = os.path.getsize(args.output) / (1024 * 1024)
+        print(f"Saved filtered export: {args.output}")
+        print(f"Date range: {start.isoformat()} through {end.isoformat()} (inclusive)")
+        print(f"Days summarized: {day_count:,}")
+        print(f"Heart-rate samples: {counts['heart_rate']:,}; step samples: {counts['steps']:,}")
+        print(f"Sleep intervals: {counts['sleep_intervals']:,}; workouts: {counts['workouts']:,}")
+        print(f"Unsupported/out-of-range records skipped: {counts['ignored_records']:,}")
+        print(f"Output size: {size_mb:.1f} MB")
+        return
+
     app = tk.Tk()
     app.withdraw()
     app.update()
@@ -184,11 +226,11 @@ def main():
     messagebox.showinfo(
         "Filtered export ready",
         f"Saved locally to:\n{destination}\n\n"
-        f"Summarized {day_count:,} dates into {counts['heart_rate']:,} heart-rate, {counts['steps']:,} step, "
-        f"{counts['sleep_intervals']:,} sleep-interval, and {counts['workouts']:,} workout source records.\n"
+        f"Summarized {day_count:,} dates from {counts['quantity_samples']:,} numeric Health samples, "
+        f"{counts['sleep_intervals']:,} sleep intervals, and {counts['workouts']:,} workouts.\n"
         f"Ignored {counts['ignored_records']:,} unsupported or out-of-range health records.\n"
-        f"Filtered file size: {__import__('os').path.getsize(destination) / (1024 * 1024):.1f} MB.\n\n"
-        "The original export was not changed. Daily summaries contain only metrics used by the tracker.",
+        f"Filtered file size: {os.path.getsize(destination) / (1024 * 1024):.1f} MB.\n\n"
+        "The original export was not changed. Numeric Apple Health metric types and units were retained as daily summaries.",
         parent=app,
     )
 
