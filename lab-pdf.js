@@ -1,7 +1,7 @@
 import { canonicalCatalogMarker, catalogMarkerDefinition } from './lab-catalog.js';
 
 const DATE_PATTERN = /\b(20\d{2}[-/.]\d{1,2}[-/.]\d{1,2}|\d{1,2}[-/.]\d{1,2}[-/.]\d{2,4})\b/;
-const NUMBER_PATTERN = /[<>]?\s*-?\d+(?:[.,]\d+)?/g;
+const NUMBER_PATTERN = /[<>]?\s*-?(?:\d{1,3}(?:\s\d{3})+(?:[.,]\d+)?|\d+(?:[.,]\d+)?)/g;
 const KNOWN_MARKERS = [
   ['Free T4', /\b(?:free\s*t4|t4\s*,?\s*free|ft4)\b/i],
   ['Free T3', /\b(?:free\s*t3|t3\s*,?\s*free|ft3)\b/i],
@@ -20,10 +20,10 @@ const KNOWN_MARKERS = [
 const MARKER_ALIASES = [
   ['TSH', ['tsh', 'ultrasensitive tsh', 'tsh ultrasensitive', 'sensitive tsh', 'tsh ultrasensible', 'thyroid stimulating hormone', 'thyroid stimulating hormone tsh', 'thyrotropin', 'tirotropina', 'hormona estimulante de la tiroides', 'hormona estimulante tiroidea', 'hormona estimulante tiroides', 'hormona estimulante tiroides ultrasensible']],
   ['Free T4', ['free t4', 'ft4', 'free thyroxine', 'thyroxine free', 't4 free', 't4 libre', 't4 libre ft4', 't4 libre suero', 'thyroxine libre', 'tiroxina libre', 'tiroxina libre t4', 'tiroxina libre suero', 't4l']],
-  ['Free T3', ['free t3', 'ft3', 'free triiodothyronine', 'triiodothyronine free', 't3 free', 't3 libre', 'triyodotironina libre', 'triiodotironina libre', 't3l']],
+  ['Free T3', ['free t3', 'ft3', 'free triiodothyronine', 'triiodothyronine free', 'triiodothyronine t3 free', 'triiodothyronine (t3) free', 't3 free', 't3 libre', 'triyodotironina libre', 'triiodotironina libre', 't3l']],
   ['Total T4', ['total t4', 't4 total', 'thyroxine total', 'thyroxine t4', 'thyroxine t4 total', 'tiroxina total', 't4 total serum']],
   ['Total T3', ['total t3', 't3 total', 'triiodothyronine total', 'triiodotironina total']],
-  ['Thyroid Peroxidase Antibodies', ['tpo', 'tpo ab', 'tpo antibodies', 'thyroid peroxidase antibodies', 'thyroid peroxidase tpo ab', 'anti tpo', 'anti tpo antibodies', 'anticuerpos tpo', 'anticuerpos anti tpo', 'anticuerpos antiperoxidasa', 'anticuerpos antiperoxidasa tiroidea', 'anticuerpos contra la peroxidasa tiroidea']],
+  ['Thyroid Peroxidase Antibodies', ['tpo', 'tpo ab', 'tpo antibodies', 'thyroid peroxidase antibodies', 'thyroid peroxidase tpo ab', 'anti tpo', 'anti tpo antibodies', 'anticuerpos tpo', 'anticuerpos anti tpo', 'anticuerpos anti microsomas', 'anticuerpos anti microsomales', 'anticuerpos antiperoxidasa', 'anticuerpos antiperoxidasa tiroidea', 'anticuerpos contra la peroxidasa tiroidea']],
   ['Thyroglobulin Antibodies', ['tg ab', 'tg antibodies', 'thyroglobulin antibodies', 'anti thyroglobulin', 'anticuerpos antitiroglobulina', 'anticuerpos anti tiroglobulina']],
   ['TSI', ['tsi', 'thyroid stimulating immunoglobulin', 'thyroid stimulating immunoglobulins', 'inmunoglobulina estimulante tiroidea', 'inmunoglobulinas estimulantes tiroideas']],
   ['TRAb', ['trab', 'tsh receptor antibodies', 'tsh receptor ab', 'thyrotropin receptor antibodies', 'anticuerpos del receptor de tsh', 'anticuerpos receptor tsh', 'anticuerpos anti receptor de tsh']],
@@ -89,12 +89,12 @@ export function isBiomarkerName(marker) {
 
 function isExcludedReportLabel(marker) {
   const normalized = normalizeMarkerText(marker).replace(/\s+\d{2}$/, '');
-  return /^(?:name|patient(?: name| id| number| identifier)?|patient id|patient identifier|id paciente|identificacion(?: del paciente)?|age|edad|sex|sexo|gender|genero|dob|date of birth|fecha de nacimiento|birth(?: date)?|date(?: of birth| collected| of service)?|fecha(?: de (?:nacimiento|toma|recoleccion|extraccion|servicio))?|page(?: \d+)?|reference(?: interval| range| values?)?|rango de referencia|intervalo de referencia|valores de referencia|test(?: name)?|result(?: flag)?|specimen(?: id| type)?|accession(?: number)?|order(?: number)?|account(?: number)?|report(?: date| number)?|labcorp|diagnosis|women|men|female|male|mujeres|hombres|trimester|trimestre|patient information|informacion del paciente|informacion personal)(?:\b|$)/.test(normalized);
+  return /^(?:name|patient(?: name| id| number| identifier)?|patient id|patient identifier|id paciente|identificacion(?: del paciente)?|age|edad|sex|sexo|gender|genero|dob|date of birth|fecha de nacimiento|birth(?: date)?|date(?: of birth| collected| of service)?|fecha(?: de (?:nacimiento|toma|recoleccion|extraccion|servicio))?|page(?: \d+)?|reference(?: interval| range| values?)?|rango de referencia|intervalo de referencia|valores de referencia|test(?: name)?|result(?:ado| flag)?|specimen(?: id| type)?|accession(?: number)?|order(?: number)?|account(?: number)?|report(?: date| number)?|labcorp|diagnosis|women|men|female|male|mujer(?:es)?|hombres|trimester|trimestre|patient information|informacion del paciente|informacion personal|ab|immunoglobulin|panel|toma de muestra)(?:\b|$)/.test(normalized);
 }
 
 function isReferenceAnnotationLine(line) {
   const normalized = normalizeMarkerText(line);
-  return /^(?:(?:i|ii|iii|iv|1st|2nd|3rd|first|second|third) trimester|(?:primer|segundo|tercer) trimestre|women|men|female|male|mujeres|hombres|femenino|masculino|reference|reference range|normal range|rango de referencia|intervalo de referencia|age|edad)\b/.test(normalized);
+  return /^\s*[([]\s*\d+(?:[.,]\d+)?\s*%/.test(String(line)) || /^(?:(?:i|ii|iii|iv|1st|2nd|3rd|first|second|third) trimester|(?:primer|segundo|tercer) trimestre|women|men|female|male|mujer(?:es)?|hombres|femenino|masculino|reference|reference range|normal range|normal(?: values?)?|rango de referencia|rango optimo|intervalo de referencia|age|edad|adequate|adecuado|optimal|optimo|potentially toxic|potencialmente toxico|associated with|asociado a|cardiovascular risk|riesgo cardiovascular|children|ninos|follicular phase|fase folicular|mid cycle|medio ciclo|ovulation|ovulacion|oral contraceptive|contraceptivos orales|postmenopausal|posmenopausicas?|hirsutism|hirsutismo|diabetes care|ada ranges|rangos recomendados|less than|greater than|menor de|menos de|mayor de|mas de|valores mayores de|adultos|nacidos|prediabetes|diabetes|buen control|good control|therapeutic target|objetivo terapeutico|negative|positive|equivocal|negativo|positivo|inconcluso|interpretation|interpretacion|diagnosis|diagnostico|ciclo completo|fase lutea|fase ovulatoria|con contraceptivos|mujeres por ciclo|menopausicas|en hirsutismo|with pernicious anemia|immunoglobulin|\d+ h nacidos|\d+ \d+ anos?|> \d+ anos?)\b/.test(normalized);
 }
 
 function isStructuredLabMarker(marker) {
@@ -105,7 +105,7 @@ function isStructuredLabMarker(marker) {
 function isLayoutBiomarkerLabel(marker) {
   const text = String(marker || '').replace(/\s+/g, ' ').trim();
   const normalized = normalizeMarkerText(text);
-  return Boolean(text && text.length <= 100 && /[a-z]/i.test(text) && !DATE_PATTERN.test(text) && !isExcludedReportLabel(text) && !isReferenceAnnotationLine(text) && !/\b(?:reference|range|interval|patient|paciente|birth|nacimiento|age|edad|sex|gender|sexo|genero|trimestre|trimester|women|mujeres|men|hombres|specimen|accession|diagnosis|page|account|order)\b/.test(normalized));
+  return Boolean(text && text.length >= 3 && text.length <= 100 && !/^[<>]?\s*\d/.test(text) && /[a-z]/i.test(text) && !DATE_PATTERN.test(text) && !isExcludedReportLabel(text) && !isReferenceAnnotationLine(text) && !/^comprobacion diferencial$/.test(normalized) && !/\b(?:reference|range|interval|patient|paciente|birth|nacimiento|age|edad|sex|gender|sexo|genero|trimestre|trimester|women|mujeres|men|hombres|specimen|accession|diagnosis|page|account|order)\b/.test(normalized));
 }
 
 export function canonicalLabMarker(marker) {
@@ -119,7 +119,7 @@ export function labMarkerIdentity(marker) {
   return /(?:calculated free testosterone \(cft\) %|bioavailable testosterone %)$/i.test(canonical) ? `${normalized} percent` : normalized;
 }
 
-const LAB_UNITS = /^(?:%|units?|u?m?iu\/(?:l|ml)|µiu\/(?:l|ml)|μiu\/(?:l|ml)|mu\/l|ng\/(?:dl|ml|l)|u?g\/(?:dl|ml|l)|pg\/(?:ml|l)|pmol\/l|nmol\/l|mmol\/l|u?mol\/l|µmol\/l|μmol\/l|mg\/(?:dl|l)|g\/(?:dl|l)|u\/l|iu\/l|ml\/min(?:\/\d+(?:\.\d+)?)?|cells?\/(?:ul|µl|μl)|k\/ul|fl|pg|seconds?|sec|minutes?|min|ratio|index|copies\/ml|10\^?\d+\/(?:l|ul))$/i;
+const LAB_UNITS = /^(?:%|units?|u?m?iu\/(?:l|ml)|µiu\/(?:l|ml)|μiu\/(?:l|ml)|(?:µ|μ)lu\/(?:l|ml)|mu\/l|ng\/(?:dl|ml|l)|u?g\/(?:dl|ml|l)|pg\/(?:ml|l)|pmol\/l|nmol\/l|mmol\/l|u?mol\/l|µmol\/l|μmol\/l|mg\/(?:dl|l)|g\/(?:dl|l)|u\/l|iu\/l|ml\/min(?:\/\d+(?:\.\d+)?)?|cells?\/(?:ul|µl|μl)|k\/ul|fl|pg|seconds?|sec|minutes?|min|ratio|index|copies\/ml|10\^?\d+\/(?:l|ul))$/i;
 const DOSE_UNITS = /^(?:mg|mcg|µg|μg|ug|g|grams?|iu|ml|capsules?|caps?|tablets?|pills?|scoops?|drops?|cfu|billion)(?:\s|$)/i;
 
 const normalizeDate = (raw) => {
@@ -202,7 +202,7 @@ function rowsFromOrphan(marker, orphan, currentDate) {
 
 function parseIndentedResultLine(line) {
   if (isReferenceAnnotationLine(line)) return null;
-  const match = line.match(/^\s*([<>≤≥]?\s*-?\d+(?:[.,]\d+)?)(?:\s+([*†‡]+|HIGH|LOW|H|L))?(?:\s+([a-zµμ%][a-z0-9µμ/^.-]*))?(?:\s+(.*))?$/i);
+  const match = line.match(/^\s*([<>≤≥]?\s*-?(?:\d{1,3}(?:\s\d{3})+(?:[.,]\d+)?|\d+(?:[.,]\d+)?))(?:\s+([*†‡]+|HIGH|LOW|H|L))?(?:\s+([a-zµμ%][a-z0-9µμ/^.-]*))?(?:\s+(.*))?$/i);
   if (!match) return null;
   const value = Number(match[1].replace(/[<>≤≥\s]/g, '').replace(',', '.'));
   if (!Number.isFinite(value)) return null;
@@ -247,10 +247,12 @@ function extractValueTail(tail) {
   if (!result) return null;
   const rest = tail.slice(result.end).trim();
   const rangeMatch = rest.match(/(?:^|\s)([<>]?\s*-?\d+(?:[.,]\d+)?)\s*(?:-|\u2013|\u2014|to)\s*([<>]?\s*-?\d+(?:[.,]\d+)?)/i);
-  const unitEnd = rangeMatch ? rangeMatch.index : rest.length;
-  const units = rest.slice(0, unitEnd).replace(/^[|,;:\s]+|[|,;:\s]+$/g, '').slice(0, 36);
+  const firstToken = (rest.match(/^[*†‡▲▼↑↓HLM]+\s*([^\s,;]+)/i)?.[1] || rest.split(/[\s,;]+/, 1)[0] || '').replace(/^[*†‡▲▼↑↓]+|[*†‡▲▼↑↓]+$/g, '');
+  const units = isLabUnit(firstToken) ? firstToken : '';
   const reference = rangeMatch ? rangeMatch[0].trim().replace(/^[\s-]+/, '') : '';
-  return { value: result.value, units, reference };
+  const flagMatch = rest.match(/(?:^|\s)(HIGH|LOW|H|L|▲|▼|↑|↓)(?:\s|$)/i);
+  const explicitFlag = /^(?:HIGH|H|▲|↑)$/i.test(flagMatch?.[1] || '') ? 'H' : /^(?:LOW|L|▼|↓)$/i.test(flagMatch?.[1] || '') ? 'L' : '';
+  return { value: result.value, units, reference, flag: explicitFlag || rangeFlag(result.value, reference), flagSource: explicitFlag ? 'report' : reference ? 'reference interval' : '' };
 }
 
 function isLabUnit(units) {
@@ -335,13 +337,25 @@ function candidateForLine(line, reportDate) {
     if (!details) return null;
     return { marker, date, ...details };
   }
-  const numeric = firstNumber(line);
-  if (!numeric) return null;
-  const marker = line.slice(0, numeric.index).replace(/[|,:;\s-]+$/g, '').replace(/^[|,:;\s-]+/g, '').trim();
-  if (marker.length > 100 || (!isBiomarkerName(marker) && !isLayoutBiomarkerLabel(marker)) || DATE_PATTERN.test(marker)) return null;
-  if (isExcludedReportLabel(marker) || isReferenceAnnotationLine(marker) || /\b(?:page|phone|fax|zip|account|patient|specimen|accession|collected|reported|reference|range|result|date|dob)\b/i.test(marker)) return null;
-  const details = extractValueTail(line.slice(numeric.index));
-  return details ? { marker, date, ...details } : null;
+  const numericMatches = [...line.matchAll(/(?<![A-Za-zÀ-ÿ0-9])[<>≤≥]?\s*-?(?:\d{1,3}(?:\s\d{3})+(?:[.,]\d+)?|\d+(?:[.,]\d+)?)(?![A-Za-zÀ-ÿ0-9])/g)];
+  for (const match of numericMatches) {
+    const prefix = line.slice(0, match.index).replace(/[|,:;\s-]+$/g, '').replace(/^[|,:;\s-]+/g, '').trim();
+    if (!prefix || prefix.length > 120 || DATE_PATTERN.test(prefix) || isExcludedReportLabel(prefix) || isReferenceAnnotationLine(prefix)) continue;
+    const markerCandidates = [...prefix.matchAll(/[A-Za-zÀ-ÿ0-9][A-Za-zÀ-ÿ0-9()./%-]*/g)];
+    let recognizedMarker = '';
+    for (let end = 0; end < markerCandidates.length; end += 1) {
+      const candidate = prefix.slice(0, markerCandidates[end].index + markerCandidates[end][0].length).replace(/[|,:;\s-]+$/g, '').trim();
+        if (!candidate || isExcludedReportLabel(candidate) || isReferenceAnnotationLine(candidate)) continue;
+        const alias = MARKER_ALIAS_MAP.get(normalizeMarkerText(candidate));
+        const canonical = canonicalCatalogMarker(alias || candidate);
+        if (alias || catalogMarkerDefinition(canonical)) recognizedMarker = canonical;
+    }
+    const marker = recognizedMarker || prefix;
+    if (!recognizedMarker && (!isLayoutBiomarkerLabel(marker) || /\b(?:page|phone|fax|zip|account|patient|specimen|accession|collected|reported|reference|range|result|date|dob|panel|profile|antibodies against|diagnosis)\b/i.test(marker) || /^(?:a[- ]?\d+|\d+\s*h\s+nacidos)\b/i.test(marker) || (marker.match(/,/g) || []).length > 1)) continue;
+    const details = extractValueTail(line.slice(match.index));
+    if (details) return { marker, date, ...details };
+  }
+  return null;
 }
 
 export function parseLabLines(rawLines, filenameDate = '') {
@@ -368,6 +382,7 @@ export function parseLabLines(rawLines, filenameDate = '') {
       const result = parseIndentedResultLine(line);
       if (result && isMoreIndentedLine(pendingMarker, lineRecord) && matchingPdfStyle(pendingMarker, lineRecord) && !isReferenceAnnotationLine(line)) {
         for (const row of rowsFromIndentedResult(pendingMarker, lineRecord, reportDate)) {
+          row.marker = canonicalLabMarker(row.marker);
           const key = [normalizeMarkerText(row.marker), row.date, row.value, row.units.toLowerCase()].join('|');
           if (!seen.has(key)) { seen.add(key); rows.push(row); }
         }
@@ -379,6 +394,7 @@ export function parseLabLines(rawLines, filenameDate = '') {
     if (orphanMatch) {
       if (pendingMarker && isMoreIndentedLine(pendingMarker, lineRecord) && matchingPdfStyle(pendingMarker, lineRecord)) {
         for (const row of rowsFromOrphan(pendingMarker.text, orphanMatch, reportDate)) {
+          row.marker = canonicalLabMarker(row.marker);
           const key = [row.marker.toLowerCase(), row.date, row.value, row.units.toLowerCase()].join('|');
           if (!seen.has(key)) { seen.add(key); rows.push(row); }
         }
@@ -386,21 +402,24 @@ export function parseLabLines(rawLines, filenameDate = '') {
       pendingMarker = null;
       continue;
     }
-    if (isMarkerOnlyLine(line) || isLayoutBiomarkerLabel(line)) { pendingMarker = lineRecord; }
+    if (!firstNumber(line) && (isMarkerOnlyLine(line) || isLayoutBiomarkerLabel(line))) { pendingMarker = lineRecord; }
     else pendingMarker = null;
     if (/^.+\s+\d{2}$/.test(line) && isBiomarkerName(line.replace(/\s+\d{2}$/, ''))) continue;
     const dated = parseDatedLabcorpLine(line, reportDate);
     if (dated) {
       for (const row of dated) {
+        row.marker = canonicalLabMarker(row.marker);
         const key = [row.marker.toLowerCase(), row.date, row.value, row.units.toLowerCase()].join('|');
         if (!seen.has(key)) { seen.add(key); rows.push(row); }
       }
       continue;
     }
-    const structured = parseLabcorpCbcLine(line, reportDate);
-    const candidates = structured || [candidateForLine(line, reportDate)].filter(Boolean);
+    const candidate = candidateForLine(line, reportDate);
+    const structured = candidate ? null : parseLabcorpCbcLine(line, reportDate);
+    const candidates = candidate ? [candidate] : structured || [];
     for (const row of candidates) {
       if (!Number.isFinite(row.value)) continue;
+      row.marker = canonicalLabMarker(row.marker);
       const key = [row.marker.toLowerCase(), row.date, row.value, row.units.toLowerCase()].join('|');
       if (seen.has(key)) continue;
       seen.add(key);
@@ -417,13 +436,21 @@ function textLinesFromItems(items) {
     let line = buckets.find((entry) => Math.abs(entry.y - y) < 2.2);
     if (!line) { line = { y, cells: [] }; buckets.push(line); }
     const fontSize = Math.hypot(item.transform?.[0] ?? 0, item.transform?.[1] ?? 0) || item.height || null;
-    line.cells.push({ x: item.transform?.[4] ?? 0, text: item.str, fontSize, fontName: item.fontName || '' });
+    line.cells.push({ x: item.transform?.[4] ?? 0, width: item.width || 0, text: item.str, fontSize, fontName: item.fontName || '' });
   });
   return buckets.sort((a, b) => b.y - a.y).map((line) => {
     const cells = line.cells.sort((a, b) => a.x - b.x);
     const fontSizes = cells.map((cell) => cell.fontSize).filter(Number.isFinite);
+    const text = cells.reduce((joined, cell, index) => {
+      if (!index) return cell.text;
+      const previous = cells[index - 1];
+      const gap = cell.x - (previous.x + previous.width);
+      const size = Math.max(1, cell.fontSize || previous.fontSize || 10);
+      const needsSpace = gap > size * 0.16 && !/^[,.;:%)\]»]/.test(cell.text) && !/[([{«]$/.test(previous.text);
+      return `${joined}${needsSpace ? ' ' : ''}${cell.text}`;
+    }, '').replace(/\s+/g, ' ').trim();
     return {
-      text: cells.map((cell) => cell.text).join(' ').replace(/\s+/g, ' ').trim(),
+      text,
       indent: cells[0]?.x ?? 0,
       fontSize: fontSizes.length ? fontSizes.reduce((sum, size) => sum + size, 0) / fontSizes.length : null,
       fontNames: [...new Set(cells.map((cell) => cell.fontName).filter(Boolean))],
