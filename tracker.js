@@ -1117,10 +1117,14 @@ function categoryMarker(category, markerName) { return category.markers.find((na
 function ensureCatalogMarker(markerName, categoryHint = activeLabCategory) {
   const name = canonicalUserLabMarker(markerName);
   if (data.hiddenLabMarkers?.[markerReferenceKey(name)]) return name;
-  if (labCategories().some((category) => categoryMarker(category, name))) return name;
-  const preferred = catalogCategoryForMarker(markerName);
-  const category = labCategories().find((item) => item.name === preferred) || labCategories().find((item) => item.name === categoryHint) || labCategories()[0];
-  if (category && name) category.markers.push(name);
+  const categories = labCategories();
+  const matches = categories.filter((category) => categoryMarker(category, name));
+  const preferred = catalogCategoryForMarker(name);
+  const category = categories.find((item) => item.name === preferred) || matches[0] || categories.find((item) => item.name === categoryHint) || categories[0];
+  if (category) {
+    categories.filter((item) => item !== category).forEach((item) => { item.markers = item.markers.filter((marker) => markerReferenceKey(marker) !== markerReferenceKey(name)); });
+    if (!categoryMarker(category, name)) category.markers.push(name);
+  }
   return name;
 }
 
@@ -1212,10 +1216,16 @@ function addLabCatalogMarkerPrompt() {
 }
 
 function migrateExistingLabCatalog() {
-  let changed = false;
+  let changed = normalizeLabCategoryMarkers();
   data.labs.forEach((lab) => {
     const marker = canonicalUserLabMarker(lab.marker);
     if (marker !== lab.marker) { lab.marker = marker; changed = true; }
+    const categoryCount = labCategories().filter((category) => categoryMarker(category, marker)).length;
+    const preferredCategory = catalogCategoryForMarker(marker);
+    if (preferredCategory && (categoryCount !== 1 || !labCategories().some((category) => category.name === preferredCategory && categoryMarker(category, marker)))) {
+      ensureCatalogMarker(marker);
+      changed = true;
+    }
     const key = markerReferenceKey(marker);
     if (data.hiddenLabMarkers[key]) return;
     if (!labCategories().some((category) => category.markers.some((name) => markerReferenceKey(name) === key))) {
@@ -1224,6 +1234,26 @@ function migrateExistingLabCatalog() {
     }
   });
   if (changed) saveData();
+}
+
+function normalizeLabCategoryMarkers() {
+  const categories = labCategories();
+  const normalized = categories.map((category) => ({ ...category, markers: [] }));
+  const owners = new Set();
+  categories.forEach((category, categoryIndex) => {
+    category.markers.forEach((marker) => {
+      const name = canonicalUserLabMarker(canonicalLabMarker(marker));
+      const key = markerReferenceKey(name);
+      if (!key || owners.has(key)) return;
+      owners.add(key);
+      const preferred = catalogCategoryForMarker(name);
+      const target = normalized.find((item) => item.name === preferred) || normalized[categoryIndex];
+      target.markers.push(name);
+    });
+  });
+  const changed = normalized.some((category, index) => JSON.stringify(category.markers) !== JSON.stringify(categories[index].markers));
+  if (changed) data.labCategories = normalized;
+  return changed;
 }
 
 function openLabCategoryMenu(name) {

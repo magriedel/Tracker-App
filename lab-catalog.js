@@ -151,7 +151,9 @@ export function catalogMarkerDefinition(value) {
 }
 
 export function catalogCategoryForMarker(value) {
-  return catalogMarkerDefinition(value)?.category || '';
+  const definition = catalogMarkerDefinition(value);
+  if (definition?.category) return definition.category;
+  return DEFAULT_LAB_CATEGORIES.find((category) => category.markers.some((marker) => marker.name === definition?.name))?.name || '';
 }
 
 export function defaultLabCategories() {
